@@ -917,6 +917,16 @@ export default function Home() {
               Know what to keep.
             </p>
           </div>
+          <nav className="footer-contact" aria-label="Tikdam contact and social links">
+            <span>Get in touch</span>
+            <a href="mailto:tikdambaithana@gmail.com">tikdambaithana@gmail.com</a>
+            <a href="https://www.instagram.com/tikdamxyz/" target="_blank" rel="noopener noreferrer">
+              Instagram ↗
+            </a>
+            <a href="https://x.com/Tikdamxyz" target="_blank" rel="noopener noreferrer">
+              X / Twitter ↗
+            </a>
+          </nav>
           <a className="button button-lime" href="/app">
             Open app <ArrowUpRight size={18} aria-hidden="true" />
           </a>

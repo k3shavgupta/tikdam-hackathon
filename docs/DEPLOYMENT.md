@@ -17,3 +17,9 @@ Staging version `ba99b7b5-7fe3-4855-83ce-0db911b404eb` and production version `2
 Before deployment, 1,167 project tests and 1,000 offline evaluation cases passed, and the combined production build completed after installing the landing package's locked dependencies. Private fictional Meta checks covered a France purchase question and Brazil client-payment explanation; details and limits are in `docs/evaluation/WORLDWIDE-ASSISTANT-2026-11-02.md`.
 
 Staging and production HTTP checks returned 250 countries and AI disabled. France returned general preparation with no local source. Brazil returned a payment reconciliation with a 20.00 BRL gap, no benefit amount and no local source. Production `/` and `/app` returned 200, `www` redirected with 308, unauthenticated admin paths returned 403, and `/.env.local` returned 404. The served app bundle contains the new unreviewed-location assistant warning. Live browser AI remains unavailable pending Access and Turnstile setup.
+
+## Contact links — 2 November 2026
+
+Staging version `4bc73199-69c7-4637-9cde-06ecf377e44a` and production version `12096416-990a-48d3-9c7e-7768a9836508` add Tikdam's email, Instagram and X links to the homepage footer and the X handle to social metadata. The existing `/app` checker, primary navigation and logo download remain in place. Public AI stays disabled.
+
+The landing lint, combined production build and 40 Worker tests passed. Staging and production HTTP checks verified the homepage, checker, 12 static assets, inline-script CSP hashes, protected routes, 404 behavior and a deterministic India purchase plan. Production also returned the three new links and `www.tikdam.xyz/app` redirected to the canonical host.

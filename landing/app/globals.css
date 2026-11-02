@@ -241,6 +241,10 @@ button { cursor: pointer; }
 .footer { background: var(--ink); color: var(--paper); padding: 64px 0 25px; }
 .footer-top { display: flex; justify-content: space-between; align-items: start; gap: 30px; padding-bottom: 69px; }
 .footer-top p { color: #bdb9ab; margin: 18px 0 0; }
+.footer-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.footer-contact span { color: #bdb9ab; font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.footer-contact a { color: var(--paper); text-decoration: underline; text-decoration-color: #777468; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.footer-contact a:hover { color: var(--lime); text-decoration-color: currentColor; }
 .footer-bottom { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid #5a5952; padding-top: 22px; font-size: .78rem; color: #c2beaf; }
 .footer-bottom a { color: var(--paper); padding: 10px 0; margin: -10px 0; }
 .not-found { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 40px max(24px, calc((100vw - 1220px)/2)); }

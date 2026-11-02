@@ -28,6 +28,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
+    creator: "@Tikdamxyz",
     title: "Tikdam | Check before you buy",
     description: "Can you claim it? Check first.",
   },
