@@ -54,12 +54,12 @@ export function createChatPayload({ purpose, facts, history }) {
   const plan = planPurchase(facts),
     result =
       purpose === "explain" && facts.mode !== "before" ? assess(facts) : null;
-  const sources = [
-    ...c.sources,
-    ...(facts.mode === "client" ? [clientSources[c.code]] : []),
-  ].filter(Boolean);
+  const sources = (facts.mode === "client"
+    ? [clientSources[c.code]]
+    : c.sources
+  ).filter(Boolean);
   const explanations = {
-    route: plan.route.text,
+    ...(facts.mode === "client" ? {} : { route: plan.route.text }),
     result: result
       ? `${result.title}. ${result.benefit.amount === null ? "No numerical benefit is determined for these facts." : `${result.benefit.label}: ${result.benefit.amount} ${result.benefit.currency}. This is conditional and is not a cash refund.`}`
       : "Check the actual purchaser, registration, seller invoice and business-purpose evidence before buying.",
@@ -163,7 +163,7 @@ export function parseChatResult(text, { purpose, sources, explanations }) {
     if (purpose === "explain") {
       if (value.explanationIds.some((id) => !Object.hasOwn(explanations, id)))
         throw Error();
-      const ids = [...new Set([...value.explanationIds, "limits"])];
+      const ids = [...new Set(["result", ...value.explanationIds, "limits"])];
       return {
         message: ids
           .map((id) => explanations[id])

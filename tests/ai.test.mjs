@@ -2,7 +2,22 @@ import test from "node:test";
 import {readFile} from "node:fs/promises";
 import assert from "node:assert/strict";
 import { createAiService } from "../server/ai/service.mjs";
+import { createChatPayload, parseChatResult } from "../server/ai/schemas.mjs";
 import { verifiedPricing } from "../server/ai/pricing.mjs";
+
+test("client explanation cannot select purchase VAT guidance", () => {
+  const pack = createChatPayload({
+    purpose: "explain",
+    facts: { mode: "client", country: "GB", businessCountry: "GB", amountReceived: "100", withheld: "20", gross: "120", currency: "GBP" },
+    history: [{ role: "user", content: "What caused the client payment gap?" }],
+  });
+  assert.equal(Object.hasOwn(pack.explanations, "route"), false);
+  assert.deepEqual(pack.sources.map((source) => source.id), ["gb-client-1"]);
+  assert.throws(() => parseChatResult(JSON.stringify({ explanationIds: ["route"], sourceIds: ["gb-client-1"] }), { purpose: "explain", ...pack }));
+  const answer = parseChatResult(JSON.stringify({ explanationIds: ["evidence"], sourceIds: ["gb-client-1"] }), { purpose: "explain", ...pack });
+  assert.match(answer.message, /No numerical benefit is determined/);
+  assert.doesNotMatch(answer.message, /VAT-registered businesses/);
+});
 
 const now = () => Date.parse("2026-11-01T12:00:00Z");
 const env = {

@@ -167,6 +167,7 @@ test("client invoice produces a certificate request and separates the payment ga
   assert.equal(r.reconciliation.gap, "12.00");
   assert.equal(r.reconciliation.unexplained, "0.00");
   assert.equal(r.cashRefund, null);
+  assert.deepEqual(r.sources.map((source) => source.id), ["gb-client-1"]);
 });
 test("calendar-invalid date does not pass a supported estimate", () => {
   assert.equal(

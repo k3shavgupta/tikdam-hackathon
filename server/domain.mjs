@@ -121,7 +121,7 @@ export function assess(f) {
       label: "Withholding credit / refund review",
     };
     result.title = "Check what was deducted before claiming";
-    result.sources = [clientSources[c.code], ...plan.sources].filter(Boolean);
+    result.sources = [clientSources[c.code]].filter(Boolean);
     if (!reviewedCodes.has(c.code)) add('coverage', 'Local withholding, credit, and refund rules have not been reviewed for this location. This is an evidence request only.');
     result.clientRequest = `Please provide the payment breakdown and withholding/deduction certificate for invoice ${f.invoiceNumber || "[invoice number]"}, issued by ${f.legalName || "[legal issuer name]"}.\n\nPlease identify the gross invoice amount, amount paid, any tax withheld, tax jurisdiction, deduction date and the taxpayer credited. Please distinguish tax from platform/bank fees, FX, retention and unpaid balances, and provide the relevant certificate or remittance reference.\n\nThis is an evidence request, not a confirmation that a refund is due.`;
     try {

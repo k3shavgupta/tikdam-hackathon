@@ -367,8 +367,8 @@ export const clientSources = {
     "https://www.incometax.gov.in/iec/foportal/help/all-topics/e-filing-services/tds-compliance",
   ),
   GB: source(
-    "HMRC: CIS deduction recovery (construction only)",
-    "https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/pay-tax-and-claim-back-deductions",
+    "HMRC: foreign tax credit relief (where applicable)",
+    "https://www.gov.uk/tax-foreign-income/taxed-twice",
   ),
   AU: source(
     "ATO: foreign-resident withholding",
