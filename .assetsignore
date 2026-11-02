@@ -1,0 +1,8 @@
+.env*
+.dev.vars*
+*.map
+*.sql
+*.md
+*.jsonc
+.git/
+node_modules/

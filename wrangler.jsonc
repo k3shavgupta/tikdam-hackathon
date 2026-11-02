@@ -1,0 +1,74 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tikdam-v1-staging",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "vars": {
+    "AI_ENABLED": "false",
+    "META_MODEL": "muse-spark-1.3",
+    "APP_ORIGINS": "https://tikdam-v1-staging.k3shavgupta.workers.dev,http://localhost:8787,http://127.0.0.1:8787"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tikdam-v1-staging",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "37 3 * * *"
+    ]
+  },
+  "env": {
+    "production": {
+      "name": "tikdam-v1",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "AI_ENABLED": "false",
+        "META_MODEL": "muse-spark-1.3",
+        "APP_ORIGINS": "https://tikdam.xyz,https://www.tikdam.xyz",
+        "CANONICAL_ORIGIN": "https://tikdam.xyz"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "tikdam-v1-production",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "tikdam.xyz/*",
+          "zone_name": "tikdam.xyz"
+        },
+        {
+          "pattern": "www.tikdam.xyz/*",
+          "zone_name": "tikdam.xyz"
+        }
+      ],
+      "triggers": {
+        "crons": [
+          "47 3 * * *"
+        ]
+      }
+    }
+  }
+}

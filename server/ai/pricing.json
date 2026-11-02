@@ -1,0 +1,21 @@
+{
+  "version": "meta-standard-2026-11-01.1",
+  "checked": "2026-11-01",
+  "model": "muse-spark-1.3",
+  "mode": "standard",
+  "inputUsdPerMillion": 1.25,
+  "cachedInputUsdPerMillion": 0.15,
+  "outputUsdPerMillion": 4.25,
+  "maxInputTokens": 20000,
+  "maxOutputTokens": 1200,
+  "preflightRequired": true,
+  "singleIterationOnly": true,
+  "toolsAllowed": false,
+  "sources": [
+    "https://dev.meta.ai/docs/pricing-rate-limits",
+    "https://dev.meta.ai/docs/token-counting",
+    "https://dev.meta.ai/docs/api-reference/responses/schemas"
+  ],
+  "basis": "Reserve full uncached input at the allowed rendered-context ceiling and the capped output including reasoning. After reservation, tokenize the exact payload before generation. No hosted tools, previous_response_id, automatic loop or retries. Final estimated cost uses returned usage; preflight is not a provider invoice. Media is counted by Meta, not inferred from pages or dimensions.",
+  "limitations": "Token-counting and pricing documentation differ in wording about injected steering-context accounting. Count includes the initial rendered input and is used conservatively for one iteration without hosted tools; returned usage remains authoritative for estimated cost. Provider contract changes or usage beyond the reserved bounds cause unknown billing, retained allowance and AI pause. App enforcement does not independently guarantee the provider bill."
+}

@@ -1,0 +1,5 @@
+# Evaluation results
+
+As of 2 November 2026, the deterministic offline manifest passed 1,000 cases without provider traffic. The selected live Meta set passed 25 distinct fictional fixtures: 19 chat and 6 document extraction cases. An additional 10 fictional extraction cases passed their bounded fixture assertions, covering JPEG, WebP, rotated PDF, credit note, mixed rates, foreign currency, document injection, Hindi, Japanese and Chinese. These are selected checks, not an OCR accuracy estimate or a validation of tax entitlement. See [COSTS.csv](COSTS.csv) for per-case attempt and returned-usage estimates and [COVERAGE.md](COVERAGE.md) for the first set's assertions and limits.
+
+The app's automated suite passed 1,160 tests, and `npm run build` passed on 2 November 2026. Public browser AI remains disabled pending access and verification controls; owner sign-in and the full public AI flow remain unverified. Baseten and Modal attempts did not establish a successful comparison or document processing. Provider billing and credit application were not independently verified.

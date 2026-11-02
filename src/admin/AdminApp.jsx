@@ -1,0 +1,100 @@
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {api} from '../api.mjs';
+import '../admin.css';
+
+const usd = value => Number.isSafeInteger(value) ? new Intl.NumberFormat('en-US', {style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(value/1000000) : 'Unavailable';
+const time = value => value && !Number.isNaN(Date.parse(value)) ? new Intl.DateTimeFormat(undefined, {dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(new Date(value))+' UTC' : '—';
+const number = value => Number.isFinite(value) ? value.toLocaleString() : 'Unavailable';
+const label = value => String(value || 'Unspecified').replaceAll('_',' ');
+const initialFilters={from:'',to:'',country:'',status:'',operation:''};
+function query(filters, extra={}) {const params=new URLSearchParams(Object.entries({...filters,...extra}).filter(([,value])=>value!==''&&value!==undefined));return params.size?'?'+params:'';}
+
+export default function AdminApp(){
+ const [overview,setOverview]=useState(null),[jobs,setJobs]=useState({items:[],total:0}),[coverage,setCoverage]=useState([]),[feedback,setFeedback]=useState({items:[],total:0});
+ const [evaluation,setEvaluation]=useState(null),[evaluationError,setEvaluationError]=useState('');
+ const [filters,setFilters]=useState(initialFilters),[applied,setApplied]=useState(initialFilters),[offset,setOffset]=useState(0),[feedbackOffset,setFeedbackOffset]=useState(0);
+ const [busy,setBusy]=useState(true),[action,setAction]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[authError,setAuthError]=useState(false);
+ const [limits,setLimits]=useState({campaign:'',daily:'',calls:''}),[purgeKind,setPurgeKind]=useState('events'),[confirmation,setConfirmation]=useState('');
+ const generation=useRef(0);
+ const load=useCallback(async()=>{
+  const version=++generation.current;setBusy(true);setError('');setAuthError(false);
+  try{
+   const [summary,records,routes,messages,evaluationReport]=await Promise.all([
+    api('/api/admin/overview'+query({from:applied.from,to:applied.to})),
+    api('/api/admin/jobs'+query(applied,{limit:25,offset})),
+    api('/api/admin/coverage'),api('/api/admin/feedback'+query({},{limit:25,offset:feedbackOffset})),
+    api('/api/admin/evaluation').catch(err=>{if(err.status===401||err.status===403)throw err;return{snapshot:null,error:'Evaluation reporting is unavailable. Production records remain separate.'};}),
+   ]);
+   if(version!==generation.current)return;
+   setOverview(summary);setJobs(records);setCoverage(routes.items||[]);setFeedback(messages);setEvaluation(evaluationReport.snapshot||null);setEvaluationError(evaluationReport.error||'');
+   setLimits({campaign:String(summary.settings.campaignCapMicrousd/1000000),daily:String(summary.settings.dailyCapMicrousd/1000000),calls:String(summary.settings.dailyCallCap)});
+  }catch(err){if(version===generation.current){setError(err.message);const denied=err.status===401||err.status===403||err.code==='INVALID_RESPONSE';setAuthError(denied);if(denied){setOverview(null);setJobs({items:[],total:0});setCoverage([]);setFeedback({items:[],total:0});setEvaluation(null);setEvaluationError('');}}}
+  finally{if(version===generation.current)setBusy(false);}
+ },[applied,offset,feedbackOffset]);
+ useEffect(()=>{load();return()=>{generation.current++;};},[load]);
+ async function changeSettings(patch){
+  if(action)return;setAction('settings');setError('');setNotice('');
+  try{await api('/api/admin/settings',patch);setNotice('Processing settings saved. No model request was sent.');await load();}
+  catch(err){setError(err.message);}finally{setAction('');}
+ }
+ async function saveLimits(event){
+  event.preventDefault();if(!overview||action)return;
+  const campaign=Math.round(Number(limits.campaign)*1000000),daily=Math.round(Number(limits.daily)*1000000),calls=Number(limits.calls);
+  if(!Number.isSafeInteger(campaign)||campaign<0||campaign>overview.settings.campaignCapMicrousd||!Number.isSafeInteger(daily)||daily<0||daily>overview.settings.dailyCapMicrousd||!Number.isInteger(calls)||calls<1||calls>overview.settings.dailyCallCap){setError('Enter limits no higher than the current values. At least one daily call must remain allowed.');return;}
+  const patch={};if(campaign!==overview.settings.campaignCapMicrousd)patch.campaignCapMicrousd=campaign;if(daily!==overview.settings.dailyCapMicrousd)patch.dailyCapMicrousd=daily;if(calls!==overview.settings.dailyCallCap)patch.dailyCallCap=calls;
+  if(Object.keys(patch).length===0){setNotice('The limits are unchanged.');return;}
+  await changeSettings(patch);
+ }
+ async function purge(event){
+  event.preventDefault();if(action||confirmation!=='DELETE')return;setAction('purge');setError('');setNotice('');
+  try{const result=await api('/api/admin/purge',{kind:purgeKind,confirm:confirmation});setConfirmation('');setNotice(`${number(result.deleted)} ${purgeKind} records deleted. Campaign spending and idempotency records remain.`);await load();}
+  catch(err){setError(err.message);}finally{setAction('');}
+ }
+ const settings=overview?.settings,usage=overview?.usage;
+ return <div className="tk-admin">
+  <a className="tk-skip" href="#tk-operations">Skip to operations</a>
+  <header className="tk-admin-header"><a className="tk-admin-brand" href="/">tikdam<span>.</span></a><span>Private operations</span><a href="/">Open app</a></header>
+  <main id="tk-operations" className="tk-admin-main">
+   <div className="tk-admin-intro"><div><h1>Know what Tikdam is doing.</h1><p>Processing activity, source coverage and the credit allowance. Invoice contents are excluded from these records.</p></div><button type="button" className="tk-secondary" disabled={busy||Boolean(action)} onClick={load}>{busy?'Refreshing…':'Refresh records'}</button></div>
+   {error&&<div className="tk-error" role="alert"><p>{error}</p>{authError&&<p><a href="/admin">Open owner login</a>. Sign in with the configured Cloudflare Access identity. This dashboard cannot grant access.</p>}</div>}
+   {notice&&<p className="tk-notice" role="status">{notice}</p>}
+   {!overview&&!error&&<p role="status">Loading private operational records…</p>}
+   {overview&&<>
+    <section className="tk-budget" aria-labelledby="tk-budget-title"><div className="tk-section-heading"><div><h2 id="tk-budget-title">Keep the allowance small.</h2><p>The campaign does not reset on deploy or month change.</p></div><button type="button" className={settings.aiEnabled?'tk-pause':'tk-secondary'} disabled={Boolean(action)||busy} onClick={()=>changeSettings({aiEnabled:!settings.aiEnabled})}>{settings.aiEnabled?'Pause AI':'Resume AI budget switch'}</button></div>
+     <p className="tk-budget-state">Budget switch: <strong>{settings.aiEnabled?'enabled':'paused'}</strong>. Deployment controls and verification must also permit AI. Changing this switch sends no model request.</p>
+     <dl className="tk-metrics"><div><dt>Campaign allowance</dt><dd>{usd(settings.campaignCapMicrousd)}</dd></div><div><dt>Estimated usage cost</dt><dd>{usd(usage.spentMicrousd)}</dd></div><div><dt>Reserved allowance</dt><dd>{usd(usage.reservedMicrousd)}</dd></div><div className="tk-metric-remaining"><dt>Remaining allowance</dt><dd>{usd(usage.remainingMicrousd)}</dd></div></dl>
+     <p className="tk-note">Provider billing is authoritative. Estimates use returned token usage and the recorded price version. Reservations with unknown billing remain held.</p>
+     <p className="tk-note">{usage.pricingVersions?.length?<>Recorded price versions: {usage.pricingVersions.join(', ')}.</>:'No model price versions recorded.'}</p>
+     <div className="tk-usage-line"><span>Input tokens <strong>{number(usage.inputTokens)}</strong></span><span>Output tokens <strong>{number(usage.outputTokens)}</strong></span><span>Unknown billing <strong>{number(usage.billingUnknown)}</strong></span><span>UTC-day cap <strong>{usd(settings.dailyCapMicrousd)}</strong></span><span>Daily calls <strong>{number(settings.dailyCallCap)}</strong></span><span>In flight <strong>up to {number(settings.maxInFlight)}</strong></span></div>
+    </section>
+    <section className="tk-admin-section" aria-labelledby="tk-evaluation-title"><h2 id="tk-evaluation-title">Evaluation snapshot</h2>
+     <p className="tk-note">This is an imported aggregate snapshot from the local evaluation ledger, not a provider bill or live monitoring. It is separate from the public application's production allowance above. Date and job filters do not change these campaign totals.</p>
+     {evaluationError?<p role="status" className="tk-note">{evaluationError}</p>:!evaluation?<p className="tk-empty">No evaluation snapshot has been imported.</p>:<>
+      <p className="tk-note">Campaign {evaluation.campaignId}. Snapshot generated {time(evaluation.generatedAt)}.</p>
+      <dl className="tk-metrics"><div><dt>Evaluation ceiling</dt><dd>{usd(evaluation.combined.capMicrousd)}</dd></div><div><dt>Estimated evaluation cost</dt><dd>{usd(evaluation.combined.spentMicrousd)}</dd></div><div><dt>Held evaluation allowance</dt><dd>{usd(evaluation.combined.reservedMicrousd)}</dd></div><div><dt>Uncommitted evaluation allowance</dt><dd>{usd(evaluation.combined.remainingMicrousd)}</dd></div></dl>
+      {['meta','modal','baseten'].map(provider=>{const use=evaluation.providers[provider];return <details className="tk-route" key={provider} data-evaluation-provider={provider}><summary><strong>{provider==='meta'?'Meta':provider==='modal'?'Modal':'Baseten'}</strong><span>{use.paused?'Paused':'Not paused'} · {usd(use.spentMicrousd)} estimated</span></summary><dl className="tk-route-facts"><div><dt>Provider ceiling</dt><dd>{usd(use.capMicrousd)}</dd></div><div><dt>Held allowance</dt><dd>{usd(use.reservedMicrousd)}</dd></div><div><dt>{provider==='meta'?'Meta HTTP attempts':'Recorded HTTP attempts'}</dt><dd>{number(use.attempts)}{provider==='meta'?' / 1,000 maximum':''}</dd></div><div><dt>Generation / preflight attempts</dt><dd>{number(use.attemptsByKind.generation)} / {number(use.attemptsByKind.preflight)}</dd></div><div><dt>Metadata / compute / cleanup attempts</dt><dd>{number(use.attemptsByKind.metadata)} / {number(use.attemptsByKind.compute)} / {number(use.attemptsByKind.cleanup)}</dd></div><div><dt>Returned input / output tokens</dt><dd>{number(use.inputTokens)} / {number(use.outputTokens)}</dd></div><div><dt>Unknown billing</dt><dd>{number(use.billingUnknown)}</dd></div><div><dt>Recorded price versions</dt><dd>{use.priceVersions.length?use.priceVersions.join(', '):'None recorded'}</dd></div></dl></details>;})}
+      <p className="tk-note">Reserved allowance includes uncertain billing and does not mean that amount was charged. This view cannot reset or enable evaluation spending. Use the metered test runner's campaign controls.</p>
+     </>}
+    </section>
+    <section className="tk-admin-section" aria-labelledby="tk-activity-title"><h2 id="tk-activity-title">Activity</h2><p className="tk-note">Starts are client-reported workflow interactions. Completed checks are successful server preparation or assessment operations. Counts include examples and repeated checks. These are not unique people, filed claims or refunds paid.</p>
+     <form className="tk-filters" onSubmit={event=>{event.preventDefault();setApplied({...filters});setOffset(0);setNotice('');}}>
+      <label>From UTC date<input type="date" value={filters.from} onChange={event=>setFilters({...filters,from:event.target.value})}/></label><label>Through UTC date<input type="date" value={filters.to} min={filters.from||undefined} onChange={event=>setFilters({...filters,to:event.target.value})}/></label>
+      <label>Country<select value={filters.country} onChange={event=>setFilters({...filters,country:event.target.value})}><option value="">All countries</option>{coverage.map(route=><option key={route.code} value={route.code}>{route.name}</option>)}</select></label>
+      <label>Status<select value={filters.status} onChange={event=>setFilters({...filters,status:event.target.value})}><option value="">All statuses</option>{['running','succeeded','failed','billing_unknown','blocked'].map(status=><option key={status} value={status}>{label(status)}</option>)}</select></label>
+      <label>Operation<select value={filters.operation} onChange={event=>setFilters({...filters,operation:event.target.value})}><option value="">All operations</option>{['plan','assess','extract','chat'].map(operation=><option key={operation} value={operation}>{label(operation)}</option>)}</select></label>
+      <button className="tk-secondary" disabled={busy}>Apply filters</button>
+     </form>
+     <dl className="tk-activity-counts"><div><dt>Workflow starts</dt><dd>{number(overview.totals.started)}</dd></div><div><dt>Completed checks</dt><dd>{number(overview.totals.completed)}</dd></div><div><dt>Processing failures</dt><dd>{number(overview.totals.failed)}</dd></div></dl>
+     <p className="tk-note">Date filters apply to activity totals and jobs. Country, status and operation filters apply to the job list. Spending and token totals cover the entire campaign.</p>
+     <div className="tk-breakdowns">{[['By country',overview.byCountry],['By workflow',overview.byMode]].map(([heading,rows])=><div key={heading}><h3>{heading}</h3>{rows?.length?<ul>{rows.map((row,index)=><li key={row.code||index}><span>{label(row.code)}</span><span>{number(row.jobs)} jobs, {number(row.succeeded)} completed</span></li>)}</ul>:<p className="tk-note">No server activity in this date range.</p>}</div>)}</div>
+     <h3>Processing jobs</h3>{jobs.items.length===0?<p className="tk-empty">No processing jobs match these filters.</p>:<div className="tk-table-wrap"><table><caption className="tk-visually-hidden">Processing jobs, newest first. All times UTC.</caption><thead><tr>{['Time','Operation / country','Status','Model','Duration','Tokens in / out','Estimated cost','Request ID / error'].map(heading=><th key={heading} scope="col">{heading}</th>)}</tr></thead><tbody>{jobs.items.map(job=><tr key={job.id}><td>{time(job.createdAt)}{job.finishedAt&&<small>Finished {time(job.finishedAt)}</small>}</td><td>{label(job.operation)}<small>{label(job.country)} / {label(job.mode)}</small></td><td><span className={'tk-job-status tk-job-'+job.status}>{label(job.status)}</span></td><td>{job.model||'No model'}</td><td>{Number.isFinite(job.durationMs)?`${number(job.durationMs)} ms`:'—'}</td><td>{number(job.inputTokens||0)} / {number(job.outputTokens||0)}</td><td>{job.estimatedMicrousd==null?'Not settled':usd(job.estimatedMicrousd)}</td><td className="tk-request-id">{job.id}{job.errorCode&&<small>{job.errorCode}</small>}</td></tr>)}</tbody></table></div>}
+     <div className="tk-pagination"><button type="button" className="tk-secondary" disabled={busy||offset===0} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous jobs</button><span>{jobs.total?`${offset+1}–${Math.min(offset+25,jobs.total)} of ${number(jobs.total)}`:'0 jobs'}</span><button type="button" className="tk-secondary" disabled={busy||offset+25>=jobs.total} onClick={()=>setOffset(offset+25)}>Next jobs</button></div>
+    </section>
+    <section className="tk-admin-section" aria-labelledby="tk-coverage-title"><h2 id="tk-coverage-title">Coverage and source checks</h2><p className="tk-note">A listed country does not imply a complete calculator. Tested means code scenarios passed, not government verification or professional approval.</p>{coverage.length===0?<p className="tk-empty">No coverage records are available.</p>:coverage.map(route=><details className="tk-route" key={route.code}><summary><strong>{route.name}</strong><span>{label(route.purchaseEstimate)} · {label(route.readiness)}</span></summary><p>{route.scope}</p><dl className="tk-route-facts"><div><dt>Route version</dt><dd>{route.routeVersion||'Unavailable'}</dd></div><div><dt>Source checked</dt><dd>{route.sourceChecked||'Unverified'}</dd></div><div><dt>Transaction window</dt><dd>{route.transactionWindow?`${route.transactionWindow.from} through ${route.transactionWindow.through}`:'No numerical route'}</dd></div><div><dt>Client-payment estimates</dt><dd>{label(route.clientEstimate)}</dd></div></dl><ul>{(route.sources||[]).map((source,index)=><li key={source.id||index}><a href={source.url} rel="noreferrer" target="_blank">{source.title}</a></li>)}</ul></details>)}</section>
+    <section className="tk-admin-section" aria-labelledby="tk-feedback-title"><h2 id="tk-feedback-title">Submitted feedback</h2><p className="tk-note">Only explicit user submissions appear here. Feedback becomes eligible for daily cleanup after 90 days. Processing a backlog can take longer.</p>{feedback.items.length===0?<p className="tk-empty">No feedback has been submitted.</p>:<ol className="tk-feedback-list">{feedback.items.map(item=><li key={item.id}><p>{item.text}</p><small>{time(item.createdAt)} · {label(item.country)} · {label(item.mode)}</small></li>)}</ol>}<div className="tk-pagination"><button type="button" className="tk-secondary" disabled={busy||feedbackOffset===0} onClick={()=>setFeedbackOffset(Math.max(0,feedbackOffset-25))}>Previous feedback</button><span>{number(feedback.total)} submissions</span><button type="button" className="tk-secondary" disabled={busy||feedbackOffset+25>=feedback.total} onClick={()=>setFeedbackOffset(feedbackOffset+25)}>Next feedback</button></div></section>
+    <section className="tk-admin-section" aria-labelledby="tk-limits-title"><h2 id="tk-limits-title">Lower processing limits</h2><p className="tk-note">These controls only reduce the current limits. A reduction cannot be undone here. Limits cannot fall below committed spending or calls. Raising the campaign ceiling requires a reviewed configuration change.</p><form className="tk-filters" onSubmit={saveLimits}><label>Campaign allowance in USD<input type="number" min="0" max={settings.campaignCapMicrousd/1000000} step="0.000001" value={limits.campaign} onChange={event=>setLimits({...limits,campaign:event.target.value})}/></label><label>UTC-day allowance in USD<input type="number" min="0" max={settings.dailyCapMicrousd/1000000} step="0.000001" value={limits.daily} onChange={event=>setLimits({...limits,daily:event.target.value})}/></label><label>Daily admitted calls<input type="number" min="1" max={settings.dailyCallCap} step="1" value={limits.calls} onChange={event=>setLimits({...limits,calls:event.target.value})}/></label><button className="tk-secondary" disabled={Boolean(action)||busy}>Save lower limits</button></form></section>
+    <section className="tk-admin-section tk-delete-section" aria-labelledby="tk-delete-title"><h2 id="tk-delete-title">Delete operational records</h2><p>Deletion is permanent. Campaign spending, reservations, idempotency records and the admin audit remain so deleting records cannot restore credits. Ordinary operational records become eligible for daily cleanup after 30 days, feedback after 90 days. Processing a backlog can take longer.</p><form className="tk-filters" onSubmit={purge}><label>Record type<select value={purgeKind} onChange={event=>{setPurgeKind(event.target.value);setConfirmation('');}}><option value="events">Workflow events</option><option value="jobs">Processing jobs</option><option value="feedback">Submitted feedback</option></select></label><label>Type DELETE to confirm<input type="text" autoComplete="off" value={confirmation} onChange={event=>setConfirmation(event.target.value)} placeholder="DELETE"/></label><button className="tk-danger" disabled={Boolean(action)||busy||confirmation!=='DELETE'}>Permanently delete {purgeKind}</button></form></section>
+   </>}
+  </main><footer className="tk-admin-footer">Prepared checks are not submitted claims. Operational records contain no stored bill or extracted invoice facts.</footer>
+ </div>;
+}
