@@ -39,7 +39,7 @@ test('landing page states India limits and leads into purchase review',()=>mount
  assert.match(document.querySelector('.landing-hero').textContent,/office stationery/);
  assert.match(document.querySelector('.landing-hero').textContent,/does not check GST portals/);
  assert.match(document.querySelector('.landing-hero').textContent,/businesses anywhere/);
- await click('Review a purchase bill');
+ await click('Review a bill');
  assert.equal(document.querySelector('.mode-tabs button.selected strong').textContent,'Review a bill');
  assert.match(document.querySelector('.workspace').textContent,/India stationery checks/);
 }));

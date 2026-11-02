@@ -437,24 +437,12 @@ export default function App() {
       <a className="skip" href="#main">
         Skip to Tikdam
       </a>
-      <div className="build-note">
-        <span>Tikdam V1</span>
-        <span>
-          Select from {config?.countries.length || 250} countries and territories. Local tax guidance is reviewed for 11; conditional estimates cover narrow scenarios in India, the UK and Singapore.
-        </span>
-      </div>
-      <header>
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            setPage("work");
-          }}
-        >
-          tikdam<span>.</span>
+      <header className="checker-header">
+        <a className="brand" href="/" aria-label="Tikdam homepage">
+          <img src="/brand/logo.svg" alt="Tikdam" width="147" height="34" />
         </a>
-        <nav>
+        <nav aria-label="Checker navigation">
+          <button aria-current={page === "work" ? "page" : undefined} onClick={() => setPage("work")}>My check</button>
           <button onClick={() => setPage("coverage")}>
             Coverage & sources
           </button>
@@ -540,51 +528,31 @@ export default function App() {
                 {result ? (
                   <div className="intro compact">
                     <div>
-                      <h1>A clearer next step.</h1>
+                      <h1>Your check.</h1>
                       <p>Review the route, the evidence and what to do next.</p>
                     </div>
                   </div>
                 ) : (
                   <section className="landing-hero" aria-labelledby="landing-title">
                     <div className="hero-copy">
-                      <h1 id="landing-title">Check the bill first.</h1>
-                      <p className="hero-lede">
-                        Tikdam helps businesses anywhere review purchase invoices and organise the evidence.
-                        Local tax guidance is available for 11 jurisdictions; most locations need a local rules review.
-                      </p>
-                      <button
-                        className="primary hero-action"
-                        onClick={() => {
-                          selectMode("purchase");
-                          document.getElementById("workflow")?.scrollIntoView?.({behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
-                        }}
-                      >
-                        Review a purchase bill <span aria-hidden="true">↗</span>
-                      </button>
-                      <p className="hero-scope">
-                        India’s conditional estimate currently covers ordinary office stationery
-                        under specific conditions. Tikdam does not check GST portals or file a claim.
-                      </p>
+                      <h1 id="landing-title">Your tax <span>workbench.</span></h1>
+                      <p className="hero-lede">Plan a purchase, review a bill, or check what a client paid you.</p>
+                      <details className="scope-details">
+                        <summary>What can I check here?</summary>
+                        <p>For businesses anywhere, choose from {config.countries.length} countries and territories. Eleven have reviewed guidance. India’s conditional GST estimate covers ordinary office stationery under specific conditions. Tikdam does not check GST portals or file claims.</p>
+                      </details>
                     </div>
-                    <div className="invoice-illustration">
-                      <div className="invoice-heading">
-                        <span>Purchase review</span>
-                        <span>Example · GST / IN</span>
-                      </div>
-                      <p className="invoice-title">One bill.<br/>Several checks.</p>
-                      <div className="invoice-questions">
-                        <div><span>Buyer</span><strong>Whose name is on it?</strong><small>Buyer and GSTIN</small></div>
-                        <div><span>Purchase</span><strong>What was bought?</strong><small>Purchase and business use</small></div>
-                        <div><span>Evidence</span><strong>What can you confirm?</strong><small>Evidence and return checks</small></div>
-                      </div>
-                      <p className="invoice-foot">Your answers guide the review. Government records are not verified here.</p>
-                    </div>
+                    <aside className="session-slip" aria-label="Current check summary">
+                      <div className="slip-title"><img src="/brand/icon.svg" alt="" width="24" height="24"/> Current check</div>
+                      <dl><div><dt>Task</dt><dd>{modes.find(([id]) => id === facts.mode)?.[1]}</dd></div>
+                      <div><dt>Jurisdiction</dt><dd>{country?.name || facts.country}</dd></div></dl>
+                    </aside>
                   </section>
                 )}
                 {!result && (
                   <section id="workflow" className="workflow-start" aria-labelledby="workflow-title">
                     <div className="workflow-heading">
-                      <h2 id="workflow-title">Choose what you need to do</h2>
+                      <h2 id="workflow-title">Choose your task</h2>
                       <div className="model-status">
                         <span className={config.modelConfigured ? "connected-dot" : "offline-dot"} />
                         <div>
@@ -601,12 +569,12 @@ export default function App() {
                         aria-pressed={facts.mode === id}
                         onClick={() => selectMode(id)}
                       >
-                        <span className="mode-icon">{icon}</span>
+                        <span className="mode-icon" aria-hidden="true">{icon}</span>
                         <span>
                           <strong>{title}</strong>
                           <small>{desc}</small>
                         </span>
-                        <span className="radio-dot" />
+                        <span className="radio-dot" aria-hidden="true" />
                       </button>
                     ))}
                     </div>
@@ -1150,6 +1118,8 @@ export default function App() {
                           )}
                         </div>
                       )}
+                    </section>
+                    {profile()}
                       <div className="form-end">
                         <button
                           className="primary"
@@ -1169,8 +1139,7 @@ export default function App() {
                             : "Review facts first. Eligibility depends on the applicable rules."}
                         </p>
                       </div>
-                    </section>
-                    {profile()}
+
                   </div>
                 )}
                 <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals}/>
@@ -1190,7 +1159,7 @@ export default function App() {
           </div>
         )}
         <footer>
-          <span>Clear facts. Better prepared.</span>
+          <a href="/brand/tikdam-logos.zip" download>Download Tikdam logos</a>
           <span>Estimates for review. No automatic filings.</span>
         </footer>
       </main>

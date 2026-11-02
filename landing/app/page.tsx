@@ -923,7 +923,7 @@ export default function Home() {
         </div>
         <div className="container footer-bottom">
           <span>© 2026 Tikdam</span>
-          <span>Built with care, and a paper trail.</span>
+          <a href="/brand/tikdam-logos.zip" download>Download logos</a>
           <a href="#top">Back to top ↑</a>
         </div>
       </footer>

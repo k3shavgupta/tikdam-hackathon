@@ -6,6 +6,7 @@ import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
 import "@fontsource/dm-sans/latin-700.css";
 import "./style.css";
+import "./checker.css";
 const AdminApp = lazy(()=>import("./admin/AdminApp.jsx"));
 const adminPath = /^\/admin(?:\/|$)/i.test(window.location.pathname);
 createRoot(document.getElementById("root")).render(adminPath ? <Suspense fallback={<main><p>Loading owner dashboard…</p></main>}><AdminApp /></Suspense> : <App />);

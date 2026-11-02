@@ -49,17 +49,7 @@ A simpler coin with a T-check monogram. Strong at small size, but less distincti
 
 ## Selected logo assets
 
-The production SVG files live under `landing/public/brand/`; these are the exact inline forms used to make them. The wordmark is live text on the site, set in Bricolage Grotesque, so it remains crisp and accessible.
-
-### Main logo: icon and wordmark
-
-```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 40" role="img" aria-label="Tikdam">
-  <path d="M5 3h26a2 2 0 0 1 2 2v25l-5 6-6-4-5 4-5-4-6 4-5-6V5a2 2 0 0 1 2-2Z" fill="#B6F09C" stroke="#121212" stroke-width="2.4" stroke-linejoin="round"/>
-  <path d="M10 12h15M17.5 12v11l-3.5 3-3-3m6.5 0 3 2 6-8" fill="none" stroke="#121212" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="44" y="29" fill="#121212" font-family="Bricolage Grotesque, sans-serif" font-size="29" font-weight="800" letter-spacing="-1.5">tikdam</text>
-</svg>
-```
+[Download the logo kit](https://tikdam.xyz/brand/tikdam-logos.zip). The full-colour wordmark and its black and white versions use outlined lettering so exports render consistently without an installed font. The kit includes transparent PNGs and a 180px home-screen icon. The master files live in `landing/public/brand/`. Use the full logo in headers and the receipt icon in small square spaces.
 
 ### Icon only and favicon
 

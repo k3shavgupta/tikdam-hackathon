@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: "Tikdam | Check before you buy",
     description: "Can you claim it? Check first.",
   },
-  icons: { icon: "/brand/icon.svg" },
+  icons: { icon: "/brand/icon.svg", apple: "/brand/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
