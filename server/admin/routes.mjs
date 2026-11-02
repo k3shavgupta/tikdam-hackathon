@@ -1,4 +1,5 @@
 import { z } from "zod";
+import {countryCodeSchema} from '../schema.mjs';
 
 const date = z
   .string()
@@ -16,9 +17,7 @@ const querySchema = z
       .enum(["running", "succeeded", "failed", "billing_unknown", "blocked"])
       .optional(),
     operation: z.enum(["plan", "assess", "extract", "chat"]).optional(),
-    country: z
-      .enum(["IN", "GB", "AU", "CA", "US", "ID", "VN", "SG", "CN", "AE", "JP"])
-      .optional(),
+    country: countryCodeSchema.optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
     offset: z.coerce.number().int().min(0).max(100000).optional(),
   })

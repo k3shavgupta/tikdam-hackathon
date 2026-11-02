@@ -37,7 +37,7 @@ The dashboard records processing activity. Successful processing does not mean a
 
 ## Coverage
 
-Eleven jurisdictions have preparation and routing guidance: India, UK, Australia, Canada, USA, Indonesia including Bali, Vietnam, Singapore, mainland China, UAE including Dubai, and Japan.
+The selector contains 250 countries and territories, including Kosovo's user-assigned `XK` code. Eleven have researched preparation and routing guidance: India, UK, Australia, Canada, USA, Indonesia including Bali, Vietnam, Singapore, mainland China, UAE including Dubai, and Japan. Other locations provide a general invoice and evidence checklist. Their local tax rules, credits, deductions, refunds, and filing routes have not been reviewed; no numerical eligibility amount is shown. The country list is based on `i18n-iso-countries` 7.14.0 ([MIT notice](docs/COUNTRY-DATA-LICENSE.txt)); check [ISO's country-code register](https://www.iso.org/iso-3166-country-codes.html) for changes.
 
 Numerical results are limited conditional candidate input-tax amounts for narrow domestic operating-purchase scenarios in India, UK and Singapore. The implementation transaction window is 1 January through 1 November 2026. That is a software coverage limit, not a statement that tax law starts or ends on those dates.
 

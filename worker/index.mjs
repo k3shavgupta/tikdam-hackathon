@@ -8,7 +8,7 @@ import {createEvaluationReporting} from '../server/evaluation/reporting.mjs';
 import {json,safeError,securityHeaders,checkOrigin,readJson,normalizedPath,cookieValue,keyedDigest} from './http.mjs';
 
 const uuid=z.string().uuid();
-const country=z.enum(['IN','GB','AU','CA','US','ID','VN','SG','CN','AE','JP']);
+const country=factsSchema.shape.country;
 const mode=z.enum(['before','purchase','client']);
 const extractionSchema=z.object({consent:z.literal(true),file:z.object({name:z.string().max(180),data:z.string().max(8500000)}).strict()}).strict();
 const chatSchema=z.object({purpose:z.enum(['intake','explain']),facts:factsSchema,history:z.array(z.object({role:z.enum(['user','assistant']),content:z.string().trim().min(1).max(1000)}).strict()).max(8)}).strict();
@@ -75,7 +75,7 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
         }catch{}
         if(!env.TURNSTILE_SITE_KEY||!env.TURNSTILE_SECRET_KEY||String(env.SESSION_HMAC_SECRET||'').length<32)ai={...disabled,reason:'AI controls are not configured. Manual entry remains available.'};
         const coverageRows=await coverage();
-        return securityHeaders(json({countries:countries.map(c=>({code:c.code,name:c.name,currency:c.currency,tax:c.tax,idLabel:c.idLabel,sources:c.sources,coverage:coverageRows.find(row=>row.code===c.code)?.purchaseEstimate==='conditional_narrow'?'Guidance + limited conditional estimates':'Guidance; estimates need review'})),coverage:coverageRows,indiaCheckDefinitions,clientSources:Object.values(clientSources),modelConfigured:Boolean(ai.extractionAvailable),model:env.META_MODEL||'muse-spark-1.3',provider:'Meta Model API',ai,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,limits:{fileMB:6,pdfPages:10},storage:'Invoices and profile facts are transient. Minimal operational metadata is eligible for bounded daily cleanup after 30 days, explicit feedback after 90 days; processing a backlog can take longer, and a minimal campaign spending ledger is retained to enforce the cap. Meta processing follows its service terms.'}));
+        return securityHeaders(json({countries:countries.map(c=>({code:c.code,name:c.name,currency:c.currency,tax:c.tax,idLabel:c.idLabel,sources:c.sources,coverage:coverageRows.find(row=>row.code===c.code)?.purchaseEstimate==='conditional_narrow'?'Guidance + limited conditional estimates':c.sources.length?'Guidance; estimates need review':'General evidence preparation; local rules not reviewed'})),coverage:coverageRows,indiaCheckDefinitions,clientSources:Object.values(clientSources),modelConfigured:Boolean(ai.extractionAvailable),model:env.META_MODEL||'muse-spark-1.3',provider:'Meta Model API',ai,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,limits:{fileMB:6,pdfPages:10},storage:'Invoices and profile facts are transient. Minimal operational metadata is eligible for bounded daily cleanup after 30 days, explicit feedback after 90 days; processing a backlog can take longer, and a minimal campaign spending ledger is retained to enforce the cap. Meta processing follows its service terms.'}));
       }
       if(['/api/plan','/api/assess'].includes(path)&&request.method==='POST'){
         const facts=factsSchema.parse(await readJson(request));
@@ -121,6 +121,7 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
         if(env.AI_ENABLED!=='true'||!settings.aiEnabled)throw safeError('AI_PAUSED',503,disabled.reason);
         const operation=path.slice(5);
         const body=(operation==='extract'?extractionSchema:chatSchema).parse(await readJson(request,operation==='extract'?9000000:32768));
+        if(operation==='chat'&&!countries.find(c=>c.code===body.facts.country)?.sources.length)throw safeError('COUNTRY_NOT_REVIEWED',422,'AI guidance is available only for reviewed countries. Use the manual evidence checklist here.');
         const idempotencyKey=uuid.parse(request.headers.get('Idempotency-Key'));
         const clientKey=await throttleKey(request,env,operation);
         await throttle(repository,{key:`${operation}:${session.id}`,limit:3,windowSeconds:60});

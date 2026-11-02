@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
-import { countries, clientSources, indiaCheckDefinitions } from "./catalog.mjs";
+import { countries, reviewedCountries, clientSources, indiaCheckDefinitions } from "./catalog.mjs";
+const reviewedCodes = new Set(reviewedCountries.map(country => country.code));
 export function normalizeCountry(value) {
   const v = String(value || "")
     .toLowerCase()
@@ -73,7 +74,7 @@ export function planPurchase(f) {
     country: c.code,
     countryName: c.name,
     guaranteedRefund: false,
-    readiness: "guidance",
+    readiness: reviewedCodes.has(c.code) ? "guidance" : "unreviewed",
     route: {
       type: foreign ? "foreign_business" : "domestic",
       text: foreign ? c.foreign : c.local,
@@ -93,7 +94,7 @@ export function assess(f) {
   const result = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    ruleVersion: `tikdam-${c.code.toLowerCase()}-2026-11-01.2`,
+    ruleVersion: reviewedCodes.has(c.code) ? `tikdam-${c.code.toLowerCase()}-2026-11-01.2` : 'tikdam-generic-2026-11-02.1',
     verification: "user_assertions_only",
     country: c.code,
     status: "review_required",
@@ -119,7 +120,8 @@ export function assess(f) {
       label: "Withholding credit / refund review",
     };
     result.title = "Check what was deducted before claiming";
-    result.sources = [clientSources[c.code], ...plan.sources];
+    result.sources = [clientSources[c.code], ...plan.sources].filter(Boolean);
+    if (!reviewedCodes.has(c.code)) add('coverage', 'Local withholding, credit, and refund rules have not been reviewed for this location. This is an evidence request only.');
     result.clientRequest = `Please provide the payment breakdown and withholding/deduction certificate for invoice ${f.invoiceNumber || "[invoice number]"}, issued by ${f.legalName || "[legal issuer name]"}.\n\nPlease identify the gross invoice amount, amount paid, any tax withheld, tax jurisdiction, deduction date and the taxpayer credited. Please distinguish tax from platform/bank fees, FX, retention and unpaid balances, and provide the relevant certificate or remittance reference.\n\nThis is an evidence request, not a confirmation that a refund is due.`;
     try {
       const gap = new Decimal(f.gross).minus(f.amountReceived);
@@ -152,6 +154,20 @@ export function assess(f) {
       "Reconcile gross invoice, taxes, fees and actual payment.",
       "Obtain the deduction certificate and confirm the correct taxpayer.",
       "Review source-country relief and residence-country credits together; do not count the same tax twice.",
+    ];
+    return result;
+  }
+  if (!reviewedCodes.has(c.code)) {
+    result.title = 'Prepare the evidence; local rules need review';
+    result.benefit = {type:'local_tax_review',amount:null,currency:f.currency || '',label:'Local tax treatment not reviewed'};
+    add('coverage', 'Tikdam has not reviewed this location’s tax rules. It cannot determine a credit, deduction, refund, or filing route here.');
+    if (!f.invoiceConfirmed) add('confirm_fields', 'Review and confirm the invoice details before using them.');
+    if (!f.legalName || !f.buyerName) add('buyer_missing', 'Confirm the legal purchaser and the buyer named on the invoice.');
+    else if (f.legalName.trim().toLowerCase() !== f.buyerName.trim().toLowerCase()) add('buyer_mismatch', 'The named buyer differs from the legal purchaser. Ask the seller or a local adviser to review it.');
+    if (!f.currency) add('currency_missing', 'Record the currency shown on the invoice.');
+    result.nextSteps = [
+      'Keep the final invoice, payment record, and business-purpose evidence together.',
+      'Confirm the correct local tax registration, invoice requirements, and filing route with a qualified local adviser.',
     ];
     return result;
   }

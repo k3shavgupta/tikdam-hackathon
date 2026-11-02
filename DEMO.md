@@ -9,4 +9,4 @@ This is a recording plan, not a completed video or submission. Use fictional doc
 - 2:10–2:35: review a client payment, show the gap and request the certificate. Explain why withholding and refund entitlement remain separate.
 - 2:35–3:00: show the private dashboard only after actual owner login works. Highlight estimated usage, reserved allowance and pause switch. Close with source/coverage limits and identify the work built during the event.
 
-Country guidance covers11jurisdictions; numerical routes remain narrow IN/GB/SG conditional candidates. The current transaction window ends1November2026. No claim has been filed by Tikdam. Model calls, admin login, browser/device checks and deployment each need their own evidence in the runbook.
+The selector covers 250 countries and territories; local guidance is researched for 11, and numerical routes remain narrow IN/GB/SG conditional candidates. The current transaction window ends 1 November 2026. No claim has been filed by Tikdam. Model calls, admin login, browser/device checks and deployment each need their own evidence in the runbook.

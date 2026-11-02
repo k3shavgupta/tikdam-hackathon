@@ -105,6 +105,20 @@ test("all-country guidance does not imply all-country calculators", () => {
     assert.ok(r.sources.length);
   }
 });
+test("worldwide selection prepares evidence without inventing local tax rules", () => {
+  for (const code of ["FR", "BR", "ZA", "XK"]) {
+    const input = factsSchema.parse({...facts,country:code,businessCountry:code,currency:'EUR'});
+    const plan = planPurchase(input);
+    const result = assess(input);
+    assert.equal(plan.readiness,'unreviewed');
+    assert.deepEqual(plan.sources,[]);
+    assert.equal(result.benefit.amount,null);
+    assert.equal(result.benefit.type,'local_tax_review');
+    assert.ok(result.issues.some(issue=>issue.code==='coverage'));
+    assert.deepEqual(result.sources,[]);
+  }
+  assert.equal(factsSchema.safeParse({...facts,country:'XX'}).success,false);
+});
 test("client shortfall is not assumed to be refundable withholding", () => {
   const r = assess({
     ...facts,
@@ -248,15 +262,19 @@ test("India claim-period guidance identifies the earlier annual-return limit", (
 test("coverage distinguishes tested narrow routes from guidance and withholding research", () => {
   assert.equal(typeof catalogue.getCoverage, "function");
   const coverage = catalogue.getCoverage();
-  assert.equal(coverage.length, 11);
+  assert.equal(coverage.length, 250);
   const india = coverage.find((c) => c.code === "IN");
   assert.equal(india.purchaseEstimate, "conditional_narrow");
   assert.equal(india.clientEstimate, "research_pending");
   assert.equal(india.verifiedGovernmentData, false);
   assert.equal(coverage.find((c) => c.code === "CA").purchaseEstimate, "research_pending");
-  for (const country of coverage) {
+  for (const country of coverage.filter(country=>country.readiness!=='unreviewed')) {
     assert.ok(country.sources.length);
     assert.ok(country.routeVersion);
     assert.equal(country.sourceChecked, "2026-11-01");
   }
+  const france=coverage.find(country=>country.code==='FR');
+  assert.equal(france.readiness,'unreviewed');
+  assert.equal(france.sourceChecked,null);
+  assert.deepEqual(france.sources,[]);
 });

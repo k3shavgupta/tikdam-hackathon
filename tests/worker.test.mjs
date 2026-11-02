@@ -18,7 +18,7 @@ const facts={mode:'before',country:'IN',businessCountry:'IN'};
 
 test('production config is safe and disabled AI is clearly declared',async()=>{
  const r=await api.fetch(request('/api/config'),env,{});const data=await r.json();
- assert.equal(r.status,200);assert.equal(data.countries.length,11);assert.equal(data.modelConfigured,false);assert.equal(data.ai.enabled,false);
+ assert.equal(r.status,200);assert.equal(data.countries.length,250);assert.equal(data.modelConfigured,false);assert.equal(data.ai.enabled,false);
  assert.equal(JSON.stringify(data).includes(env.SESSION_HMAC_SECRET),false);assert.equal(r.headers.get('cache-control'),'no-store');
 });
 test('ordinary deterministic flow works without provider or telemetry availability',async()=>{
@@ -46,6 +46,15 @@ test('session cookie is server-issued secure httponly same-site and has no clien
 test('public paid calls fail closed without a valid session and do not reach model',async()=>{
  const r=await api.fetch(request('/api/extract',{consent:true,file:{name:'x',data:'x'}}),env,{});assert.ok([401,503].includes(r.status));
  assert.equal((await r.json()).code!==undefined,true);
+});
+test('unreviewed country chat is denied before a paid provider call',async()=>{
+ let providerCalls=0;
+ const guarded=createHandler({repositoryFactory:()=>({...repository,getSettings:async()=>({aiEnabled:true})}),aiFactory:()=>{providerCalls++;return{chat:async()=>({message:'unexpected'})}},challengeVerifier:async()=>{}});
+ const body={purpose:'intake',facts:{mode:'before',country:'FR',businessCountry:'FR'},history:[{role:'user',content:'What should I prepare?'}]};
+ const response=await guarded.fetch(request('/api/chat',body,{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111'}),{...env,AI_ENABLED:'true'},{});
+ assert.equal(response.status,422);
+ assert.equal((await response.json()).code,'COUNTRY_NOT_REVIEWED');
+ assert.equal(providerCalls,0);
 });
 test('UI telemetry rejects arbitrary properties and invoice data',async()=>{
  const r=await api.fetch(request('/api/events',{id:crypto.randomUUID(),event:'workflow_started',mode:'purchase',country:'IN',invoiceNumber:'SECRET'},{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111'}),env,{});

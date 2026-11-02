@@ -1,7 +1,9 @@
+import {countryRegions} from './country-regions.mjs';
+
 const source = (title, url, provision = null) => ({
   title, url, checked: "2026-11-01", ...(provision ? { provision } : {}),
 });
-export const countries = [
+export const reviewedCountries = [
   {
     code: "IN",
     name: "India",
@@ -305,9 +307,21 @@ export const countries = [
     ],
   },
 ];
-for (const country of countries) {
+for (const country of reviewedCountries) {
   country.sources = country.sources.map((s, index) => ({ id: `${country.code.toLowerCase()}-${index + 1}`, ...s }));
 }
+const reviewedCodes = new Set(reviewedCountries.map(country => country.code));
+export const countries = [
+  ...reviewedCountries,
+  ...countryRegions.filter(([code]) => !reviewedCodes.has(code)).map(([code, name]) => ({
+    code, name, currency: '', tax: 'Local rules not reviewed', idLabel: 'Tax identifier, if applicable',
+    billing: 'Ask the seller which final invoice or receipt is appropriate for the actual purchaser. Confirm the buyer details, supply date, item, currency, and any tax shown with a local professional before paying.',
+    local: 'Tikdam has not reviewed this country or territory’s tax registration, input-credit, deduction, or refund rules. Keep the purchase evidence and check the current local rules with a qualified adviser.',
+    foreign: 'Cross-border registration, place of supply, tax recovery, and refund routes have not been reviewed here. Confirm the applicable countries and current rules with a qualified adviser.',
+    warning: 'No country-specific tax eligibility, rate, filing route, or refund amount is validated for this location.',
+    sources: [],
+  })),
+].sort((a, b) => a.name.localeCompare(b.name, 'en'));
 
 export const indiaCheckDefinitions = [
   { key: "received", label: "The actual buyer has received all stationery on this invoice.", provision: "CGST Act 16(2)(b) and receipt-in-lots proviso" },
@@ -323,23 +337,24 @@ export const indiaCheckDefinitions = [
 export function getCoverage() {
   return countries.map((country) => {
     const numerical = ["IN", "GB", "SG"].includes(country.code);
+    const reviewed = reviewedCodes.has(country.code);
     return {
       code: country.code,
       name: country.name,
       currency: country.currency,
-      purchaseEstimate: numerical ? "conditional_narrow" : "research_pending",
-      clientEstimate: "research_pending",
-      readiness: numerical ? "tested" : "guidance",
-      routeId: numerical ? `${country.code.toLowerCase()}-ordinary-input-credit` : `${country.code.toLowerCase()}-guidance`,
-      routeVersion: `tikdam-${country.code.toLowerCase()}-2026-11-01.2`,
-      sourceChecked: "2026-11-01",
-      sourceReview: numerical ? "official_sources_checked_for_narrow_route" : "initial_catalogue_only",
+      purchaseEstimate: numerical ? "conditional_narrow" : reviewed ? "research_pending" : "not_reviewed",
+      clientEstimate: reviewed ? "research_pending" : "not_reviewed",
+      readiness: numerical ? "tested" : reviewed ? "guidance" : "unreviewed",
+      routeId: numerical ? `${country.code.toLowerCase()}-ordinary-input-credit` : reviewed ? `${country.code.toLowerCase()}-guidance` : 'generic-evidence-preparation',
+      routeVersion: reviewed ? `tikdam-${country.code.toLowerCase()}-2026-11-01.2` : 'tikdam-generic-2026-11-02.1',
+      sourceChecked: reviewed ? "2026-11-01" : null,
+      sourceReview: numerical ? "official_sources_checked_for_narrow_route" : reviewed ? "initial_catalogue_only" : 'not_reviewed',
       transactionWindow: numerical ? { from: "2026-01-01", through: "2026-11-01" } : null,
       scope: country.code === "IN"
         ? "Domestic ordinary registered recipient, fully taxable activity, 100% business stationery, all statutory checks explicitly asserted. Candidate invoice GST only."
         : numerical
           ? "Ordinary domestic operating purchases, standard registration, fully taxable activity, confirmed business share and valid invoice. Candidate input tax only."
-          : "Preparation and evidence guidance. No numerical eligibility route released.",
+          : reviewed ? "Preparation and evidence guidance. No numerical eligibility route released." : "General invoice and evidence preparation only. Local tax rules and eligibility have not been reviewed.",
       verifiedGovernmentData: false,
       professionalSignOff: false,
       sources: country.sources,

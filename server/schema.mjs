@@ -1,4 +1,6 @@
 import { z } from "zod";
+import {countryRegions} from './country-regions.mjs';
+export const countryCodeSchema = z.enum(countryRegions.map(([code]) => code));
 const short = z.string().trim().max(200),
   amount = z
     .string()
@@ -21,32 +23,8 @@ export const indiaChecksSchema = z.object({
 export const factsSchema = z
   .object({
     mode: z.enum(["before", "purchase", "client"]),
-    country: z.enum([
-      "IN",
-      "GB",
-      "AU",
-      "CA",
-      "US",
-      "ID",
-      "VN",
-      "SG",
-      "CN",
-      "AE",
-      "JP",
-    ]),
-    businessCountry: z.enum([
-      "IN",
-      "GB",
-      "AU",
-      "CA",
-      "US",
-      "ID",
-      "VN",
-      "SG",
-      "CN",
-      "AE",
-      "JP",
-    ]),
+    country: countryCodeSchema,
+    businessCountry: countryCodeSchema,
     taxResidence: short.default("unknown"),
     workCountry: short.default("unknown"),
     legalName: short.default(""),
@@ -72,21 +50,7 @@ export const factsSchema = z
     supplierTaxId: short.default(""),
     invoiceNumber: short.default(""),
     invoiceDate: z.string().max(10).default(""),
-    currency: z
-      .enum([
-        "INR",
-        "GBP",
-        "AUD",
-        "CAD",
-        "USD",
-        "IDR",
-        "VND",
-        "SGD",
-        "CNY",
-        "AED",
-        "JPY",
-      ])
-      .default("INR"),
+    currency: z.string().regex(/^$|^[A-Z]{3}$/, 'Enter a three-letter currency code.').default("INR"),
     net: amount.default(""),
     tax: amount.default(""),
     gross: amount.default(""),

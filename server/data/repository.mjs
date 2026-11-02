@@ -1,18 +1,7 @@
 import { z } from "zod";
+import {countryCodeSchema} from '../schema.mjs';
 
-const countries = z.enum([
-  "IN",
-  "GB",
-  "AU",
-  "CA",
-  "US",
-  "ID",
-  "VN",
-  "SG",
-  "CN",
-  "AE",
-  "JP",
-]);
+const countries = countryCodeSchema;
 const modes = z.enum(["before", "purchase", "client"]);
 const id = z
   .string()

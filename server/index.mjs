@@ -79,7 +79,7 @@ export function createApp({
         sources: c.sources,
         coverage: ["IN", "GB", "SG"].includes(c.code)
           ? "Guidance + limited conditional estimates"
-          : "Guidance; estimates need review",
+          : c.sources.length ? "Guidance; estimates need review" : "General evidence preparation; local rules not reviewed",
       })),
       modelConfigured: configured,
       coverage: getCoverage(), indiaCheckDefinitions, clientSources: Object.values(clientSources),

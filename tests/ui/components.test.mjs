@@ -21,7 +21,7 @@ test.before(async()=>{
 test.after(async()=>{if(folder)await rm(folder,{recursive:true,force:true});});
 
 test('paused assistant explains manual fallback and never renders a paid send control',()=>{
- const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'IN'},config:{ai:{chatAvailable:false,reason:'AI is paused to preserve credits.'}}}));
+ const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'IN'},config:{ai:{chatAvailable:false,reason:'AI is paused to preserve credits.'},countries:[{code:'IN',sources:[{id:'in-1'}]}]}}));
  assert.match(html,/AI is paused to preserve credits/);assert.doesNotMatch(html,/Send question/);assert.match(html,/cannot confirm an invoice/);
 });
 
@@ -136,7 +136,7 @@ test('dashboard displays recorded pricing versions and an honest empty state',as
 test('assistant sends only after consent and challenge, and proposals require an apply action',async()=>{
  const requests=[],applied=[];
  const facts={mode:'before',country:'IN',businessCountry:'IN'};
- const view=await mount(components.AssistantPanel,{facts,config:{ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key',countries:[{sources:[{id:'in-1',title:'Official source',url:'https://example.test/official'}]}],clientSources:[{id:'in-client-1',title:'Official withholding source',url:'https://example.test/withholding'}]},onPropose:proposal=>applied.push(proposal)},async(path,options)=>{
+ const view=await mount(components.AssistantPanel,{facts,config:{ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key',countries:[{code:'IN',sources:[{id:'in-1',title:'Official source',url:'https://example.test/official'}]}],clientSources:[{id:'in-client-1',title:'Official withholding source',url:'https://example.test/withholding'}]},onPropose:proposal=>applied.push(proposal)},async(path,options)=>{
   requests.push({path,options});return Response.json(path==='/api/session'?{ok:true}:{message:'What will you buy?',proposals:{item:'Office stationery'},missingFields:['registration'],sourceIds:['in-1','in-client-1','https://evil.test/invented']});
  },window=>{window.turnstile={render(element,options){options.callback('synthetic-fresh-challenge');return 'widget';},remove(){}};});
  try{
@@ -153,7 +153,7 @@ test('assistant sends only after consent and challenge, and proposals require an
   assert.equal(d.querySelector('a[href="https://example.test/withholding"]')?.textContent,'Official withholding source');
   await act(async()=>{[...d.querySelectorAll('button')].find(button=>button.textContent==='Apply suggested fields').click();});
   assert.deepEqual(applied,[{item:'Office stationery'}]);
-  await act(async()=>{view.root.render(React.createElement(components.AssistantPanel,{facts:{...facts,country:'GB'},config:{ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key'},onPropose:proposal=>applied.push(proposal)}));});
+  await act(async()=>{view.root.render(React.createElement(components.AssistantPanel,{facts:{...facts,country:'GB'},config:{ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key',countries:[{code:'GB',sources:[{id:'gb-1'}]}]},onPropose:proposal=>applied.push(proposal)}));});
   assert.equal(d.querySelectorAll('.tk-turn').length,0);
   assert.equal(d.querySelector('input[type="checkbox"]').checked,false);
   assert.equal(requests.filter(row=>row.path==='/api/chat').length,1);
@@ -163,7 +163,7 @@ test('assistant sends only after consent and challenge, and proposals require an
 test('editing facts during an AI request does not permit a second send or show stale proposals',async()=>{
  let finish,requests=0;
  const response=new Promise(resolve=>{finish=resolve;});
- const config={ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key'};
+ const config={ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key',countries:[{code:'IN',sources:[{id:'in-1'}]}]};
  const facts={mode:'before',country:'IN',businessCountry:'IN'};
  const view=await mount(components.AssistantPanel,{facts,config},async(path)=>{
   if(path==='/api/chat'){requests++;return response;}return Response.json({ok:true});

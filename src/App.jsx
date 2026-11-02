@@ -58,6 +58,7 @@ function Field({ label, children, hint, wide = false }) {
   );
 }
 function Sources({ sources = [] }) {
+  if (!sources.length) return <p className="source-gap">No country-specific tax source has been reviewed for this location.</p>;
   return (
     <details className="sources">
       <summary>
@@ -118,11 +119,14 @@ export default function App() {
   function edit(key, value) {
     generation.current++;
     setBusy("");
-    setFacts((f) => ({
-      ...f,
-      [key]: value,
-      invoiceConfirmed: key === "invoiceConfirmed" ? value : false,
-    }));
+    setFacts((f) => {
+      const next = {...f, [key]: value, invoiceConfirmed: key === "invoiceConfirmed" ? value : false};
+      if (key === 'country') {
+        next.currency = config?.countries.find(c => c.code === value)?.currency || '';
+        if (f.businessCountry === f.country) next.businessCountry = value;
+      }
+      return next;
+    });
     setResult(null);
     setError("");
     setNotice("");
@@ -436,7 +440,7 @@ export default function App() {
       <div className="build-note">
         <span>Tikdam V1</span>
         <span>
-          Preparation guidance in 11 jurisdictions. Conditional estimates cover narrow scenarios in India, the UK and Singapore.
+          Select from {config?.countries.length || 250} countries and territories. Local tax guidance is reviewed for 11; conditional estimates cover narrow scenarios in India, the UK and Singapore.
         </span>
       </div>
       <header>
@@ -477,7 +481,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="coverage-grid">
-                  {config.countries.map((c) => (
+                  {config.countries.filter(c => c.sources.length).map((c) => (
                     <article key={c.code}>
                       <div className="country-code">{c.code}</div>
                       <h2>{c.name}</h2>
@@ -490,6 +494,7 @@ export default function App() {
                     </article>
                   ))}
                 </div>
+                <p>Other countries and territories are selectable for general invoice and evidence preparation. Tikdam has not reviewed their local tax rules or validated a numerical claim.</p>
                 <button className="primary" onClick={() => setPage("work")}>
                   Back to my check
                 </button>
@@ -542,11 +547,10 @@ export default function App() {
                 ) : (
                   <section className="landing-hero" aria-labelledby="landing-title">
                     <div className="hero-copy">
-                      <p className="hero-context">For Indian businesses checking a purchase</p>
-                      <h1 id="landing-title">Before input tax credit, check the bill.</h1>
+                      <h1 id="landing-title">Check the bill first.</h1>
                       <p className="hero-lede">
-                        Tikdam helps you organize invoice details, spot missing evidence and prepare
-                        a review pack. Start with a bill you have, or prepare before you buy.
+                        Tikdam helps Indian businesses review purchase invoices, check the evidence,
+                        and prepare for a possible input tax credit.
                       </p>
                       <button
                         className="primary hero-action"
@@ -585,7 +589,7 @@ export default function App() {
                         <span className={config.modelConfigured ? "connected-dot" : "offline-dot"} />
                         <div>
                           {config.modelConfigured ? "Muse Spark available" : "Manual checks available"}
-                          <small>{config.modelConfigured ? "Documents sent only with your permission" : config.ai?.reason || "AI is paused; manual checks and examples work now"}</small>
+                          <small>{config.modelConfigured ? "Documents sent only with your permission" : "AI bill reading is paused. You can still enter details manually."}</small>
                         </div>
                       </div>
                     </div>
@@ -906,8 +910,7 @@ export default function App() {
                               >
                                 {busy === "Reading bill"
                                   ? "Reading bill…"
-                                  : "Read with Muse"}{" "}
-                                <span>✦</span>
+                                  : "Read with Muse"}
                               </button>
                               {consent&&config.modelConfigured&&<TurnstileChallenge siteKey={config.turnstileSiteKey} action="extract" onToken={setChallengeToken} resetKey={challengeReset}/>}
                               {!config.modelConfigured && (
@@ -960,6 +963,7 @@ export default function App() {
                             config.countries.map((c) => [c.code, c.name]),
                           )}
                         </Field>
+                        {!country?.sources?.length && <p className="source-gap">Tikdam has not reviewed this location's tax rules. This form prepares evidence only; no credit or refund amount is calculated.</p>}
                         <Field label="What is the purchase or service?">
                           {input("item", "e.g. office supplies or design work")}
                         </Field>
@@ -1039,14 +1043,8 @@ export default function App() {
                             <Field label="Supplier tax identifier">
                               {input("supplierTaxId")}
                             </Field>
-                            <Field label="Currency">
-                              {select(
-                                "currency",
-                                config.countries.map((c) => [
-                                  c.currency,
-                                  c.currency,
-                                ]),
-                              )}
+                            <Field label="Currency (three-letter code)" hint="Use the code shown on your invoice, such as EUR or USD.">
+                              <input value={facts.currency} onChange={e => edit('currency', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))} maxLength={3} placeholder="e.g. EUR" />
                             </Field>
                             <Field label="Net amount">
                               {input("net", "0.00", "number")}

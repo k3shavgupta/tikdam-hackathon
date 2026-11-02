@@ -52,6 +52,15 @@ test('before-buy workflow builds a source-linked checklist while AI is paused',(
  await click('Build my buying checklist');
  assert.match(document.body.textContent,/Get the billing right/);assert.match(document.body.textContent,/Copy invoice request/);assert.ok(document.querySelector('.sources a[href^="https://"]'));
 }));
+test('unreviewed countries can be selected without showing tax eligibility',()=>mountApp(async(document,click)=>{
+ await click('Review a bill');
+ const country=[...document.querySelectorAll('label.field')].find(label=>label.textContent.includes('Purchase / tax country')).querySelector('select');
+ assert.equal(country.options.length,250);
+ await act(async()=>{country.value='FR';country.dispatchEvent(new window.Event('change',{bubbles:true}));});
+ assert.equal(country.value,'FR');
+ assert.match(document.body.textContent,/local rules not reviewed|not reviewed this location/i);
+ assert.doesNotMatch(document.body.textContent,/EUR 20\.00/);
+}));
 test('reviewing an example requires confirmation and shows conditional input credit',()=>mountApp(async(document,click)=>{
  await click('Review a bill');await click('Use an example');
  assert.match(document.body.textContent,/not AI extraction|not an OCR result/);

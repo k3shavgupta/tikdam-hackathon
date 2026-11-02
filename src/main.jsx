@@ -5,7 +5,6 @@ import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
 import "@fontsource/dm-sans/latin-700.css";
-import "@fontsource/ibm-plex-mono/latin-400.css";
 import "./style.css";
 const AdminApp = lazy(()=>import("./admin/AdminApp.jsx"));
 const adminPath = /^\/admin(?:\/|$)/i.test(window.location.pathname);

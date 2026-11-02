@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PDFDocument } from "pdf-lib";
+import {countryCodeSchema} from './schema.mjs';
 const nullableString = z.string().max(200).nullable();
 const decimal = z
   .string()
@@ -15,24 +16,8 @@ export const extraction = z
     supplierName: nullableString,
     supplierTaxId: nullableString,
     buyerName: nullableString,
-    country: z
-      .enum(["IN", "GB", "AU", "CA", "US", "ID", "VN", "SG", "CN", "AE", "JP"])
-      .nullable(),
-    currency: z
-      .enum([
-        "INR",
-        "GBP",
-        "AUD",
-        "CAD",
-        "USD",
-        "IDR",
-        "VND",
-        "SGD",
-        "CNY",
-        "AED",
-        "JPY",
-      ])
-      .nullable(),
+    country: countryCodeSchema.nullable(),
+    currency: z.string().regex(/^[A-Z]{3}$/).nullable(),
     item: nullableString,
     net: decimal,
     tax: decimal,

@@ -150,7 +150,7 @@ main {
   margin-bottom: 25px;
 }
 .landing-hero h1 {
-  max-width: 11.5ch;
+  max-width: 12ch;
   font-size: clamp(45px, 5.2vw, 76px);
   letter-spacing: -.065em;
   line-height: 1.02;
@@ -178,20 +178,10 @@ main {
 .invoice-illustration {
   position: relative;
   background: #fff;
-  border: 1px solid #b9cfc5;
-  padding: 32px 30px 22px 48px;
-  box-shadow: 13px 17px 0 #c8ded3;
+  border: 1px solid #c8d8d2;
+  border-left: 9px solid #c8ded3;
+  padding: 32px 30px 22px;
   transform: rotate(1.2deg);
-}
-.invoice-illustration::before {
-  content: "";
-  position: absolute;
-  top: 11px;
-  bottom: 11px;
-  left: 10px;
-  width: 18px;
-  border-right: 1px dashed #adcbc0;
-  background: radial-gradient(circle, #e6f1eb 6px, transparent 7px) center top / 18px 29px repeat-y;
 }
 .invoice-heading {
   display: flex;
@@ -200,8 +190,7 @@ main {
   padding-bottom: 15px;
   border-bottom: 1px solid #c8d8d2;
   color: #41665d;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
 }
 .invoice-title {
   color: #173d3a;
@@ -221,8 +210,7 @@ main {
 .invoice-questions span {
   grid-row: span 2;
   color: #087e72;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 12px;
 }
 .invoice-questions strong {
   color: #173d3a;
@@ -231,7 +219,7 @@ main {
 }
 .invoice-questions small {
   color: #49635d;
-  font-size: 11px;
+  font-size: 12px;
 }
 .invoice-foot {
   border-top: 1px solid #c8d8d2;
@@ -402,6 +390,16 @@ main {
   grid-template-columns: 1fr 1fr;
   gap: 21px 18px;
 }
+.source-gap {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid #667b8d;
+  background: #f3f6f7;
+  color: #344654;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -469,7 +467,7 @@ textarea::placeholder {
 .privacy {
   font-size: 11px;
   margin-top: 24px;
-  color: #677c93;
+  color: #49635d;
 }
 .form-end {
   margin-top: 31px;
@@ -929,7 +927,7 @@ footer {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: #708299;
+  color: #49635d;
   margin-top: 32px;
   padding-bottom: 20px;
 }
@@ -965,7 +963,7 @@ footer {
     gap: 9px;
   }
   .mode-tabs small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .radio-dot {
     display: none;
@@ -1027,14 +1025,14 @@ footer {
   }
   .mode-tabs small {
     display: block;
-    font-size: 11px;
+    font-size: 12px;
   }
   .mode-icon {
     margin: 0;
   }
   .build-note {
     padding: 9px 20px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .build-note > span:last-child {
     display: none;
@@ -1104,17 +1102,19 @@ footer {
     font-size: 16px;
   }
   .section-heading p {
-    font-size: 11px;
+    font-size: 13px;
   }
   .fields {
+    grid-template-columns: 1fr;
     gap: 18px 13px;
   }
   .field > span {
-    font-size: 11px;
+    font-size: 13px;
   }
   .field input,
-  .field select {
-    font-size: 12px;
+  .field select,
+  .field textarea {
+    font-size: 16px;
     padding: 11px 9px;
   }
   .form-end {
@@ -1125,7 +1125,7 @@ footer {
     margin-top: 11px;
   }
   .primary {
-    font-size: 12px;
+    font-size: 14px;
   }
   .upload {
     padding: 22px 15px;
@@ -1169,7 +1169,7 @@ footer {
   }
   footer {
     gap: 20px;
-    font-size: 10px;
+    font-size: 12px;
   }
   footer span:last-child {
     text-align: right;

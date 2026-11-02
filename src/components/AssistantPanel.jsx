@@ -9,7 +9,8 @@ export function AssistantPanel({facts,result,config,onPropose}){
  useEffect(()=>{generation.current++;setPending(null);},[facts,result]);
  useEffect(()=>{generation.current++;setHistory([]);setDraft('');setPending(null);setConsent(false);setChallenge('');setResetKey(key=>key+1);setError('');},[facts?.mode,facts?.country,facts?.businessCountry,facts?.legalName]);
  useEffect(()=>()=>{generation.current++;},[]);
- const enabled=Boolean(config?.ai?.chatAvailable);
+ const reviewed=Boolean(config?.countries?.find(country=>country.code===facts?.country)?.sources?.length);
+ const enabled=Boolean(config?.ai?.chatAvailable&&reviewed);
  const sources=[...(config?.countries||[]).flatMap(country=>country.sources||[]),...(config?.clientSources||[])];
  async function send(purpose='intake'){
   const content=purpose==='explain'?'Explain the current supported result and its missing information using the supplied sources.':draft.trim();
@@ -26,7 +27,7 @@ export function AssistantPanel({facts,result,config,onPropose}){
  return <section className="tk-assistant" aria-labelledby="tk-assistant-title">
   <div className="tk-section-heading"><h2 id="tk-assistant-title">Ask Tikdam</h2><span className="tk-tag">Meta Muse</span></div>
   <p>Describe the purchase or client payment. Tikdam can ask for missing details and suggest form updates for you to review.</p>
-  {!enabled?<p className="tk-notice" role="status">{config?.ai?.reason||'AI is paused. Complete the form manually to continue.'}</p>:<>
+  {!enabled?<p className="tk-notice" role="status">{!reviewed?'AI questions are available only for countries with reviewed sources. Use the manual evidence checklist here.':config?.ai?.reason||'AI is paused. Complete the form manually to continue.'}</p>:<>
    <div className="tk-conversation" role="log" aria-label="Conversation" aria-live="polite">{history.length===0?<p className="tk-note">For example: “I am buying a laptop for my freelance work. Which billing details should I prepare?”</p>:history.map((turn,index)=><div key={index} className={`tk-turn tk-turn-${turn.role}`}><strong>{turn.role==='user'?'You':'Tikdam'}</strong><p>{turn.content}</p></div>)}</div>
    <label className="tk-label" htmlFor="tk-question">Your question</label>
    <textarea id="tk-question" value={draft} onChange={event=>setDraft(event.target.value)} maxLength={1000} rows={3} placeholder="Tell Tikdam what you are planning or checking." disabled={busy}/>

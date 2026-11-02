@@ -18,7 +18,7 @@ test("configuration exposes coverage but never secrets", () =>
   withServer(async (url) => {
     const r = await fetch(url + "/api/config");
     const c = await r.json();
-    assert.equal(c.countries.length, 11);
+    assert.equal(c.countries.length, 250);
     assert.equal(c.modelConfigured, false);
     assert.ok(!JSON.stringify(c).includes("test-key"));
   }));

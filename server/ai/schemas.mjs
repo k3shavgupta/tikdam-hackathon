@@ -57,7 +57,7 @@ export function createChatPayload({ purpose, facts, history }) {
   const sources = [
     ...c.sources,
     ...(facts.mode === "client" ? [clientSources[c.code]] : []),
-  ];
+  ].filter(Boolean);
   const explanations = {
     route: plan.route.text,
     result: result
