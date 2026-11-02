@@ -106,16 +106,19 @@ test("all-country guidance does not imply all-country calculators", () => {
   }
 });
 test("worldwide selection prepares evidence without inventing local tax rules", () => {
-  for (const code of ["FR", "BR", "ZA", "XK"]) {
-    const input = factsSchema.parse({...facts,country:code,businessCountry:code,currency:'EUR'});
+  for (const {code, currency} of catalogue.countries) {
+    const input = factsSchema.parse({...facts,country:code,businessCountry:code,currency:currency||''});
     const plan = planPurchase(input);
     const result = assess(input);
-    assert.equal(plan.readiness,'unreviewed');
-    assert.deepEqual(plan.sources,[]);
-    assert.equal(result.benefit.amount,null);
-    assert.equal(result.benefit.type,'local_tax_review');
-    assert.ok(result.issues.some(issue=>issue.code==='coverage'));
-    assert.deepEqual(result.sources,[]);
+    assert.equal(plan.country,code);
+    assert.equal(result.country,code);
+    if (plan.readiness==='unreviewed') {
+      assert.deepEqual(plan.sources,[]);
+      assert.equal(result.benefit.amount,null);
+      assert.equal(result.benefit.type,'local_tax_review');
+      assert.ok(result.issues.some(issue=>issue.code==='coverage'));
+      assert.deepEqual(result.sources,[]);
+    }
   }
   assert.equal(factsSchema.safeParse({...facts,country:'XX'}).success,false);
   const client=assess(factsSchema.parse({...facts,mode:'client',country:'BR',businessCountry:'BR',currency:'BRL',amountReceived:'108',withheld:'12'}));

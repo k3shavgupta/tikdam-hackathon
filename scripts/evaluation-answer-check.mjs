@@ -24,9 +24,23 @@ const cases={
     history:[{role:'user',content:'A fictional client paid 100 against a 120 invoice and says 20 was tax. Can Tikdam confirm a refund, and what proof is missing?'}],
     checks:{noAmount:/No numerical benefit is determined/i,certificate:/certificate/i,noVatRoute:/^(?![\s\S]*Ordinary VAT-registered businesses)/i},
   },
+  france:{
+    id:'answer-france-preparation',operation:'chat',purpose:'intake',
+    facts:{...purchaseFacts('GB'),mode:'before',country:'FR',businessCountry:'FR',currency:'EUR',item:'Laptop',category:'equipment',invoiceConfirmed:false},
+    history:[{role:'user',content:'For a fictional business laptop purchase in France, what details should I prepare before buying?'}],
+    checks:{question:/\?$/,noTaxPromise:/^(?![\s\S]*(?:eligible|you can claim|refund|deductible|credit amount))/i,onTopic:/^(?![\s\S]*(?:income recipient|tax resident|client payment))/i},
+    expectsNoSources:true,
+  },
+  brazil:{
+    id:'answer-brazil-client-payment',operation:'chat',purpose:'explain',
+    facts:{...purchaseFacts('GB'),mode:'client',country:'BR',businessCountry:'BR',currency:'BRL',amountReceived:'100',withheld:'20',certificate:false,workCountry:'unknown',taxResidence:'unknown'},
+    history:[{role:'user',content:'A fictional Brazilian client paid 100 against a 120 invoice and says 20 was tax. What should I check?'}],
+    checks:{noAmount:/No numerical benefit is determined/i,localLimit:/not reviewed local tax rules/i,certificate:/certificate/i},
+    expectsNoSources:true,
+  },
 };
 const name=process.argv[process.argv.indexOf('--case')+1];
-if(!Object.hasOwn(cases,name))throw Error('Choose --case india, uk, or client.');
+if(!Object.hasOwn(cases,name))throw Error('Choose --case india, uk, client, france, or brazil.');
 const fixture=cases[name];
 const runtime=await openEvaluationRuntime({persistPath:'.local-state/evaluation-d1'});
 try{
@@ -38,11 +52,12 @@ try{
     const offline=JSON.parse(await fs.readFile('.local-state/evaluation/offline-results.json','utf8'));
     if(offline.failed!==0||offline.cases.length!==1000)throw Error('Exact 1,000-case offline baseline must pass first.');
     if(before.paused||before.providers.meta.paused||before.inFlight||before.providers.meta.operatingRemainingMicrousd<30100)throw Error('Evaluation campaign cannot admit a safe Meta request.');
-    const requestId=`meta:${fixture.id}:answer-check-2026-11-02${name==='client'?'-v2':''}`;
+    const requestId=`meta:${fixture.id}:answer-check-2026-11-02${name==='client'||name==='france'?'-v2':''}`;
     if((await runtime.ledger.rows()).reservations.some(row=>row.id===requestId))throw Error('This answer check already ran; review its saved result.');
     const result=await evaluateMeta({ledger:runtime.ledger,fixture,key:process.env.META_MODEL_API_KEY||process.env.MODEL_API_KEY,requestId});
     const message=result.parsed?.message||'';
     const checks=Object.fromEntries(Object.entries(fixture.checks).map(([key,pattern])=>[key,pattern.test(message)]));
+    if(fixture.expectsNoSources)checks.noSources=(result.parsed?.sourceIds||[]).length===0;
     const record={case:name,fixtureId:fixture.id,status:result.status,errorCode:result.errorCode||null,checks,renderedAnswer:message,sourceIds:result.parsed?.sourceIds||[],inputTokens:result.inputTokens??null,outputTokens:result.outputTokens??null,estimatedMicrousd:result.estimatedMicrousd??null,latencyMs:result.latencyMs,before,after:await runtime.ledger.summary()};
     await fs.mkdir('.local-state/evaluation',{recursive:true,mode:0o700});
     await fs.appendFile('.local-state/evaluation/answer-check-results.jsonl',JSON.stringify(record)+'\n',{mode:0o600});

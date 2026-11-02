@@ -25,6 +25,13 @@ test('paused assistant explains manual fallback and never renders a paid send co
  assert.match(html,/AI is paused to preserve credits/);assert.doesNotMatch(html,/Send question/);assert.match(html,/cannot confirm an invoice/);
 });
 
+test('unreviewed country can use the assistant when AI is available, with a local-rules warning',()=>{
+ const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'FR'},config:{ai:{chatAvailable:true},countries:[{code:'FR',sources:[]}]}}));
+ assert.match(html,/Send question/);
+ assert.match(html,/Local tax rules have not been reviewed/);
+ assert.doesNotMatch(html,/AI questions are available only/);
+});
+
 async function mount(Component,props,fetchImpl,setup){
  const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'https://tikdam.xyz'});
  const globals={window:dom.window,document:dom.window.document,navigator:dom.window.navigator,HTMLElement:dom.window.HTMLElement,Event:dom.window.Event,MouseEvent:dom.window.MouseEvent,IS_REACT_ACT_ENVIRONMENT:true,fetch:fetchImpl};

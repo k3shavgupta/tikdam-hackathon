@@ -47,14 +47,14 @@ test('public paid calls fail closed without a valid session and do not reach mod
  const r=await api.fetch(request('/api/extract',{consent:true,file:{name:'x',data:'x'}}),env,{});assert.ok([401,503].includes(r.status));
  assert.equal((await r.json()).code!==undefined,true);
 });
-test('unreviewed country chat is denied before a paid provider call',async()=>{
+test('unreviewed country chat reaches the bounded assistant when AI controls are enabled',async()=>{
  let providerCalls=0;
- const guarded=createHandler({repositoryFactory:()=>({...repository,getSettings:async()=>({aiEnabled:true})}),aiFactory:()=>{providerCalls++;return{chat:async()=>({message:'unexpected'})}},challengeVerifier:async()=>{}});
+ const guarded=createHandler({repositoryFactory:()=>({...repository,getSettings:async()=>({aiEnabled:true})}),aiFactory:()=>{providerCalls++;return{chat:async()=>({message:'What invoice details can you confirm?',proposals:{},missingFields:['item'],sourceIds:[]})}},challengeVerifier:async()=>{}});
  const body={purpose:'intake',facts:{mode:'before',country:'FR',businessCountry:'FR'},history:[{role:'user',content:'What should I prepare?'}]};
- const response=await guarded.fetch(request('/api/chat',body,{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111'}),{...env,AI_ENABLED:'true'},{});
- assert.equal(response.status,422);
- assert.equal((await response.json()).code,'COUNTRY_NOT_REVIEWED');
- assert.equal(providerCalls,0);
+ const response=await guarded.fetch(request('/api/chat',body,{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111','Idempotency-Key':crypto.randomUUID()}),{...env,AI_ENABLED:'true'},{});
+ assert.equal(response.status,200);
+ assert.deepEqual((await response.json()).sourceIds,[]);
+ assert.equal(providerCalls,1);
 });
 test('UI telemetry rejects arbitrary properties and invoice data',async()=>{
  const r=await api.fetch(request('/api/events',{id:crypto.randomUUID(),event:'workflow_started',mode:'purchase',country:'IN',invoiceNumber:'SECRET'},{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111'}),env,{});

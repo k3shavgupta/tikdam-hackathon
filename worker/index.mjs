@@ -124,7 +124,6 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
         if(env.AI_ENABLED!=='true'||!settings.aiEnabled)throw safeError('AI_PAUSED',503,disabled.reason);
         const operation=path.slice(5);
         const body=(operation==='extract'?extractionSchema:chatSchema).parse(await readJson(request,operation==='extract'?9000000:32768));
-        if(operation==='chat'&&!countries.find(c=>c.code===body.facts.country)?.sources.length)throw safeError('COUNTRY_NOT_REVIEWED',422,'AI guidance is available only for reviewed countries. Use the manual evidence checklist here.');
         const idempotencyKey=uuid.parse(request.headers.get('Idempotency-Key'));
         const clientKey=await throttleKey(request,env,operation);
         await throttle(repository,{key:`${operation}:${session.id}`,limit:3,windowSeconds:60});

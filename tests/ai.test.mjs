@@ -19,6 +19,38 @@ test("client explanation cannot select purchase VAT guidance", () => {
   assert.doesNotMatch(answer.message, /VAT-registered businesses/);
 });
 
+test("source-free countries get general explanations without invented local authority links", () => {
+  const pack = createChatPayload({
+    purpose: "explain",
+    facts: { mode: "purchase", country: "FR", businessCountry: "FR", currency: "EUR", item: "Laptop", category: "equipment" },
+    history: [{ role: "user", content: "What evidence do I need?" }],
+  });
+  assert.deepEqual(pack.sources, []);
+  assert.equal(pack.body.input[0].content[0].text.includes('"localSourcesReviewed":false'), true);
+  const answer = parseChatResult(JSON.stringify({ explanationIds: ["evidence"], sourceIds: [] }), { purpose: "explain", ...pack });
+  assert.match(answer.message, /No numerical benefit is determined/);
+  assert.match(answer.message, /not reviewed local tax rules or official sources/);
+  assert.deepEqual(answer.sourceIds, []);
+  assert.throws(() => parseChatResult(JSON.stringify({ explanationIds: ["result"], sourceIds: ["fr-1"] }), { purpose: "explain", ...pack }));
+});
+
+test("purchase intake ignores client-payment clarification fields", () => {
+  const pack = createChatPayload({
+    purpose: "intake",
+    facts: { mode: "before", country: "FR", businessCountry: "FR", item: "Laptop" },
+    history: [{ role: "user", content: "What should I prepare before buying?" }],
+  });
+  const answer = parseChatResult(JSON.stringify({
+    question: "Where is the income recipient tax resident?",
+    proposals: [],
+    missingFields: ["taxResidence", "workCountry", "item"],
+    sourceIds: [],
+  }), { purpose: "intake", ...pack });
+  assert.equal(answer.message, "What are you buying or providing, and how does it support your work?");
+  assert.deepEqual(answer.missingFields, ["item"]);
+  assert.deepEqual(answer.sourceIds, []);
+});
+
 const now = () => Date.parse("2026-11-01T12:00:00Z");
 const env = {
   AI_ENABLED: "true",

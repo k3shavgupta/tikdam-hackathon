@@ -43,3 +43,7 @@ Tax evidence, D1/admin data, and Workers runtime are the first parallel jobs. AI
 ## Worldwide selector release — 2 November 2026
 
 The selector contains 250 countries and territories. Eleven have researched guidance, and only narrow IN/GB/SG scenarios have conditional numerical estimates. General evidence preparation for other locations does not establish tax eligibility. The final full suite passed 1,163 tests, and the production build passed. See `docs/DEPLOYMENT.md` for deployed versions and HTTP verification.
+
+## Worldwide assistant boundary — 2 November 2026
+
+The bounded chat path now accepts all 250 locations when AI controls are enabled. For unreviewed locations, it has no local source IDs and cannot determine a tax amount, eligibility or filing route. Purchase questions ignore client-payment fields. Private live checks passed after a France purchase question was corrected and a Brazil client-payment answer was checked for missing evidence and refund limits. The full suite passed 1,167 tests, the offline evaluation passed 1,000 cases without provider calls, and the production build passed. Public AI remains off: the read-only Cloudflare controls preflight found no local `CLOUDFLARE_API_TOKEN` for owner Access and Turnstile setup.
