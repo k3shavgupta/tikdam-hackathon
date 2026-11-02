@@ -6,6 +6,6 @@ For a separate Cloudflare deployment, create your own D1 databases and replace t
 
 ## Worldwide evidence preparation — 2 November 2026
 
-Staging version `f891bec5-2cbd-4e4f-a5e7-28643886e569` and production version `02c02e3e-44e4-4990-b469-368a9a3b1ad4` serve the 250-location selector. Eleven locations have researched guidance; only narrow IN/GB/SG scenarios can return conditional numerical amounts. The other 239 provide general invoice and evidence preparation without local tax conclusions. Public AI remains disabled.
+Staging version `c2ec365b-aaa9-488e-afa0-c0f379d333f0` and production version `c234ebed-9f27-41ca-bc8a-99195cec46c5` serve the 250-location selector. Eleven locations have researched guidance; only narrow IN/GB/SG scenarios can return conditional numerical amounts. The other 239 provide general invoice and evidence preparation without local tax conclusions. Public AI remains disabled.
 
 The full suite passed 1,163 tests before the final landing-copy change; 25 focused UI tests and a production build passed afterward. Production HTTP checks confirmed Brazil receives no numerical amount, the UK example remains conditional, the app serves the worldwide wording, `www` redirects and unauthenticated admin access is denied.

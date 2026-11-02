@@ -118,6 +118,11 @@ test("worldwide selection prepares evidence without inventing local tax rules", 
     assert.deepEqual(result.sources,[]);
   }
   assert.equal(factsSchema.safeParse({...facts,country:'XX'}).success,false);
+  const client=assess(factsSchema.parse({...facts,mode:'client',country:'BR',businessCountry:'BR',currency:'BRL',amountReceived:'108',withheld:'12'}));
+  assert.equal(client.benefit.type,'payment_reconciliation');
+  assert.equal(client.benefit.amount,null);
+  assert.deepEqual(client.sources,[]);
+  assert.ok(client.issues.some(issue=>issue.code==='coverage'));
 });
 test("client shortfall is not assumed to be refundable withholding", () => {
   const r = assess({

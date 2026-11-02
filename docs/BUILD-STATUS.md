@@ -42,4 +42,4 @@ Tax evidence, D1/admin data, and Workers runtime are the first parallel jobs. AI
 
 ## Worldwide selector release — 2 November 2026
 
-The selector contains 250 countries and territories. Eleven have researched guidance, and only narrow IN/GB/SG scenarios have conditional numerical estimates. General evidence preparation for other locations does not establish tax eligibility. The full suite passed 1,163 tests; after the final landing-copy change, 25 focused UI tests and the production build passed. See `docs/DEPLOYMENT.md` for deployed versions and HTTP verification.
+The selector contains 250 countries and territories. Eleven have researched guidance, and only narrow IN/GB/SG scenarios have conditional numerical estimates. General evidence preparation for other locations does not establish tax eligibility. The final full suite passed 1,163 tests, and the production build passed. See `docs/DEPLOYMENT.md` for deployed versions and HTTP verification.

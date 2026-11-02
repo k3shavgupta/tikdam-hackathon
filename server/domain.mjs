@@ -28,6 +28,7 @@ const countryFor = (f) =>
 export function planPurchase(f) {
   const c = countryFor(f);
   if (!c) throw new Error("Choose a supported jurisdiction.");
+  const reviewed = reviewedCodes.has(c.code);
   const foreign =
     f.businessCountry && normalizeCountry(f.businessCountry) !== c.code;
   const checklist = [
@@ -53,16 +54,16 @@ export function planPurchase(f) {
       text: foreign ? c.foreign : c.local,
     },
   ];
-  const warnings = [
+  const warnings = reviewed ? [
     c.warning,
     "A correctly named invoice is evidence; it does not create eligibility by itself.",
-    "Company registration and VAT/GST registration are different.",
-  ];
-  if (f.registration !== "standard")
+    "Company registration and applicable tax registration are different.",
+  ] : [c.warning, "An invoice alone does not establish a tax benefit. Confirm local registration and invoice rules separately."];
+  if (reviewed && f.registration !== "standard")
     warnings.unshift(
       "Check the applicable tax registration and regime before expecting an input-tax credit. Registration can create filing and payment obligations.",
     );
-  if (f.category !== "ordinary")
+  if (reviewed && f.category !== "ordinary")
     warnings.unshift(
       "Equipment, vehicles, travel, meals and mixed-use assets need category-specific rules.",
     );
@@ -74,7 +75,7 @@ export function planPurchase(f) {
     country: c.code,
     countryName: c.name,
     guaranteedRefund: false,
-    readiness: reviewedCodes.has(c.code) ? "guidance" : "unreviewed",
+    readiness: reviewed ? "guidance" : "unreviewed",
     route: {
       type: foreign ? "foreign_business" : "domestic",
       text: foreign ? c.foreign : c.local,
@@ -155,6 +156,15 @@ export function assess(f) {
       "Obtain the deduction certificate and confirm the correct taxpayer.",
       "Review source-country relief and residence-country credits together; do not count the same tax twice.",
     ];
+    if (!reviewedCodes.has(c.code)) {
+      result.title = 'Reconcile the payment; local tax rules need review';
+      result.benefit = {type:'payment_reconciliation',amount:null,currency:f.currency || '',label:'Payment difference review'};
+      result.nextSteps = [
+        'Reconcile the invoice, actual payment, fees, exchange differences, and any reported deduction.',
+        'Request a breakdown and any tax certificate from the payer.',
+        'Ask a qualified local adviser to identify the applicable tax treatment and filing route.',
+      ];
+    }
     return result;
   }
   if (!reviewedCodes.has(c.code)) {
