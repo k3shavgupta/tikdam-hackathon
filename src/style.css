@@ -1040,24 +1040,23 @@ footer {
     display: none;
   }
   header {
-    height: 75px;
-    padding: 0 20px;
+    height: auto;
+    display: block;
+    padding: 19px 20px 16px;
   }
   .brand {
     font-size: 27px;
+    margin-bottom: 11px;
   }
   nav {
-    gap: 8px;
+    justify-content: space-between;
   }
   nav button {
-    font-size: 10px;
-    padding: 7px 4px;
-  }
-  nav button:nth-child(2) {
-    display: none;
+    font-size: 11px;
+    padding: 7px 0;
   }
   .reset {
-    padding: 8px;
+    padding: 8px 10px;
   }
   main {
     padding: 25px 20px;

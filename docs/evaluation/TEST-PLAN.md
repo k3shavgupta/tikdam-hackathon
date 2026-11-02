@@ -81,3 +81,7 @@ The first two Meta pilot attempts produced `MODEL_INCOMPLETE`, under run tags `i
 Record actual provider HTTP attempts separately from generation operations, unique fixtures and offline cases. Include failure/retest history, assertion scope, returned tokens, estimated usage, held unknown amounts, observed provider billing evidence, stop reason, cleanup state and deployed version.
 
 Do not report tax-authority approval, filing, a paid refund, multilingual accuracy, real-device testing, successful owner login or public end-to-end AI unless that specific result has independent evidence.
+
+## User-requested extended run
+
+On 2 November, after the original25 cases passed, the user explicitly requested more testing. The same persistent campaign admitted13 additional synthetic extraction cases in reviewed batches10+3 under `extended-v1`. No cap, paused provider or reservation was reset. All13 passed. Use `npm run eval:live -- --extended` for a dry-run; live requires deliberate `--live`, an at-most10 batch and review of current holds. Supplemental cases do not inflate or replace the exact1,000-case manifest. See COVERAGE.md for measured assertions and remaining limits.

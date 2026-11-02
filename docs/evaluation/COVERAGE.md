@@ -1,7 +1,5 @@
 # Evaluation coverage and limits
 
-This audit describes the first 25-case selected live set. Later synthetic extraction samples are recorded in [RESULTS.md](RESULTS.md) and [COSTS.csv](COSTS.csv); the gaps below refer to the first set unless stated otherwise.
-
 This is a coverage audit of the current fixture set and recorded Meta results. It distinguishes production contract tests, live model samples and unverified workflows.
 
 ## What has evidence
@@ -13,6 +11,7 @@ This is a coverage audit of the current fixture set and recorded Meta results. I
 | Image validation | Valid PNG/JPEG/WebP and truncated/corrupt/oversized-image regressions; actual bundled Workers execution | Structural format/dimension guards execute in the deployed runtime family |
 | Meta pilot | Two incomplete outputs, followed by a passing minimal-reasoning pilot | The initial output-completeness issue was real and its retest passed |
 | Selected Meta set | `coverage-batch-1`: 25 unique fixtures passed | The assertions for 19 chat and 6 extraction operations passed for this synthetic sample |
+| Extended Meta set | `extended-v1`: 13 additional unique fixtures passed | JPEG/WebP, rotation, negative credit-note rejection, mixed visible tax, foreign currency, document injection, Hindi/Japanese/Chinese, light blur, zero tax and absent facts |
 | Provider accounting | Persistent evaluation ledger and separate cost report | Usage estimates/reservations and attempts can be reconciled; provider invoice remains separate |
 
 The image validator checks bounded container structure, checksums where supported, dimensions, payload boundaries and required markers. It does not fully decode every compressed pixel and is not a malware or visual-quality certification.
@@ -39,16 +38,20 @@ The ordinary PDF/PNG checks compare specific known values. Missing tax fields, a
 
 The first two incomplete pilots are retained in the history. The subsequent successful IN pilot repeats a fixture, so it increases executed attempts but not the 25 unique selected-fixture count. A later repeat run also must not increase unique coverage.
 
+## Additional testing requested on 2 November
+
+The user requested more testing after the original clean batches. `extended.mjs` adds thirteen unique invoice cases without changing the exact1,000-case manifest. All thirteen passed the specified live assertions. Its fourteen supplemental offline tests validate uniqueness and actual upload/file bounds. Language images were rendered with a local Unicode font and visually inspected; money values and IDs remain explicit known ground truth. This is a small synthetic sample, not a country-format or multilingual benchmark.
+
 ## Gaps and deferred cases
 
 | Gap | Present status |
 |---|---|
-| Hindi, Japanese, Chinese, Vietnamese and other native-script OCR | Not live evaluated; country selection does not establish language coverage |
-| Blurred, low-light, rotated, cropped or handwritten invoices | Not live evaluated in this selected set |
-| Multi-rate line items, discounts, tax-inclusive conversions and complex rounding | No live extraction/calculation accuracy claim |
-| Credit notes, negative amounts and refund documents | No supported live credit-note workflow claim; current scalar amount schema is nonnegative |
+| Native-script OCR | One synthetic Hindi, Japanese and Chinese image each passed selected amount/ID assertions; Vietnamese and broader language/format coverage remain untested |
+| Degraded and rotated input | One light-blur image and one rotated native PDF passed; low-light, crop, severe blur and handwriting remain untested |
+| Complex amounts | One mixed-rate visible aggregate and one zero-tax invoice passed; discounts, tax-inclusive conversions, detailed line reconciliation and complex rounding remain untested |
+| Credit notes | One negative credit note returned unknown document type and null amounts; supported credit-note/refund accounting is not implemented |
 | Real scans and receipts from varied suppliers | Synthetic fixtures only; no private customer documents were uploaded by this workstream |
-| Live JPEG and WebP OCR | Structural validation passes locally/Workers; live extraction set uses PNG/PDF only |
+| JPEG/WebP | One fictional image of each format passed selected live amount/ID assertions; broader scan quality remains untested |
 | All eleven country-specific legal calculations | Not implemented or validated; numerical coverage remains narrow IN/GB/SG conditional input-tax cases |
 | Withholding/treaty refund amounts | Client evidence guidance does not establish final annual entitlement or refund |
 | Real phones/tablets, assistive technology and full manual browser flow | No real-device verification from this workstream |
