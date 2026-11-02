@@ -549,8 +549,8 @@ export default function App() {
                     <div className="hero-copy">
                       <h1 id="landing-title">Check the bill first.</h1>
                       <p className="hero-lede">
-                        Tikdam helps Indian businesses review purchase invoices, check the evidence,
-                        and prepare for a possible input tax credit.
+                        Tikdam helps businesses anywhere review purchase invoices and organise the evidence.
+                        Local tax guidance is available for 11 jurisdictions; most locations need a local rules review.
                       </p>
                       <button
                         className="primary hero-action"
@@ -569,7 +569,7 @@ export default function App() {
                     <div className="invoice-illustration">
                       <div className="invoice-heading">
                         <span>Purchase review</span>
-                        <span>GST / IN</span>
+                        <span>Example · GST / IN</span>
                       </div>
                       <p className="invoice-title">One bill.<br/>Several checks.</p>
                       <div className="invoice-questions">

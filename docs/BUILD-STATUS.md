@@ -39,3 +39,7 @@ Tax evidence, D1/admin data, and Workers runtime are the first parallel jobs. AI
 
 - Latest production release `e9ef39e2-986a-4ac2-8af3-86aca6dcfef7` has the final retention-copy corrections. Existing110 tests remain green.
 - Missing local scoped Cloudflare token confirmed by the read-only control preflight. Account-specific Access/Turnstile setup automation is excluded from this public repository.
+
+## Worldwide selector release — 2 November 2026
+
+The selector contains 250 countries and territories. Eleven have researched guidance, and only narrow IN/GB/SG scenarios have conditional numerical estimates. General evidence preparation for other locations does not establish tax eligibility. The full suite passed 1,163 tests; after the final landing-copy change, 25 focused UI tests and the production build passed. See `docs/DEPLOYMENT.md` for deployed versions and HTTP verification.
