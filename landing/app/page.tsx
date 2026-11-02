@@ -384,8 +384,8 @@ export default function Home() {
               </a>
             ))}
           </nav>
-          <a className="button button-lime nav-cta" href="#demo">
-            Try the demo <ArrowUpRight size={17} aria-hidden="true" />
+          <a className="button button-lime nav-cta" href="/app">
+            Open app <ArrowUpRight size={17} aria-hidden="true" />
           </a>
           <button
             className="menu-button"
@@ -414,8 +414,8 @@ export default function Home() {
                 <ArrowUpRight size={17} aria-hidden="true" />
               </a>
             ))}
-            <a href="#demo" onClick={() => setMenuOpen(false)}>
-              Try the demo <ArrowUpRight size={17} aria-hidden="true" />
+            <a href="/app" onClick={() => setMenuOpen(false)}>
+              Open app <ArrowUpRight size={17} aria-hidden="true" />
             </a>
           </nav>
         )}
@@ -828,7 +828,7 @@ export default function Home() {
                   application work.
                 </p>
               </div>
-              <a href="/app" target="_blank" rel="noreferrer">
+              <a href="/app">
                 Open the current app{" "}
                 <ArrowUpRight size={17} aria-hidden="true" />
               </a>
@@ -917,8 +917,8 @@ export default function Home() {
               Know what to keep.
             </p>
           </div>
-          <a className="button button-lime" href="#demo">
-            Try the preview <ArrowUpRight size={18} aria-hidden="true" />
+          <a className="button button-lime" href="/app">
+            Open app <ArrowUpRight size={18} aria-hidden="true" />
           </a>
         </div>
         <div className="container footer-bottom">
