@@ -1,3 +1,4 @@
+import {landingScriptHashes} from './landing-csp.mjs';
 export function safeError(code, status, message) {
   return Object.assign(new Error(message), { code, status });
 }
@@ -6,7 +7,7 @@ export function json(value, status=200, extra={}) {
   return new Response(JSON.stringify(value), {status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...extra}});
 }
 
-export function securityHeaders(response) {
+export function securityHeaders(response,{landing=false}={}) {
   const headers=new Headers(response.headers);
   headers.set('X-Content-Type-Options','nosniff');
   headers.set('Referrer-Policy','strict-origin-when-cross-origin');
@@ -14,6 +15,10 @@ export function securityHeaders(response) {
   headers.set('X-Frame-Options','DENY');
   headers.set('Strict-Transport-Security','max-age=31536000');
   headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  if(landing&&/text\/html/i.test(headers.get('Content-Type')||'')){
+    const policy=headers.get('Content-Security-Policy').replace("script-src 'self'","script-src 'self' "+landingScriptHashes.join(' ')).replace("style-src 'self'","style-src 'self' 'unsafe-inline'");
+    headers.set('Content-Security-Policy',policy);
+  }
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 

@@ -12,3 +12,6 @@ test-results/
 playwright-report/
 __pycache__/
 *.pyc
+
+landing/out/
+**/*.tsbuildinfo

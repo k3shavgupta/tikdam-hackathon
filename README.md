@@ -2,14 +2,15 @@
 
 Tikdam helps freelancers and small businesses prepare before buying, review purchase bills, and investigate deductions from client payments. The public app runs on Cloudflare Workers with a React/Vite frontend and D1 operational metadata.
 
-- Production: https://tikdam.xyz
+- Homepage: https://tikdam.xyz
+- Purchase checker: https://tikdam.xyz/app
 - Preview: https://tikdam-v1-staging.k3shavgupta.workers.dev
 - Owner dashboard: https://tikdam.xyz/admin, denied until Cloudflare Access is configured.
 - Public AI is disabled pending Access/Turnstile configuration. The private, budgeted evaluation successfully exercised Meta with fictional chat/PDF/image inputs; see `docs/evaluation/RESULTS.md`. Owner login and public browser AI are not yet verified.
 
 ## Run and verify
 
-Use Node 22 or newer. Install with `npm ci`.
+Use Node 22 or newer. Install both packages with `npm ci` and `npm --prefix landing ci`. The combined build exports the homepage at `/` and the interactive checker at `/app`.
 
 ```sh
 npm run dev

@@ -55,14 +55,17 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
           return securityHeaders(response||json({code:'NOT_FOUND',message:'Unknown admin API route.',requestId},404));
         }
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Use GET to open the dashboard.');
-        const asset=await env.ASSETS.fetch(new Request(new URL('/index.html',request.url),{method:request.method,headers:request.headers}));
+        const asset=await env.ASSETS.fetch(new Request(new URL('/app.html',request.url),{method:request.method,headers:request.headers}));
         const headers=new Headers(asset.headers);headers.set('Cache-Control','no-store');
         return securityHeaders(new Response(asset.body,{status:asset.status,headers}));
       }
       if(!isApi){
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Method not allowed.');
         if(!env.ASSETS)throw safeError('ASSETS_UNAVAILABLE',503,'Application assets are not configured.');
-        return securityHeaders(await env.ASSETS.fetch(request));
+        const appPath=lower==='/app'||lower.startsWith('/app/');
+        const assetPath=appPath?'/app.html':path==='/'?'/index.html':path;
+        const asset=await env.ASSETS.fetch(new Request(new URL(assetPath,request.url),request));
+        return securityHeaders(asset,{landing:!appPath&&assetPath!=='/app.html'});
       }
       if(path==='/api/config'&&request.method==='GET'){
         let ai={...disabled};

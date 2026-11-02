@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=.env.local server/index.mjs",
-    "build": "vite build",
+    "build": "node scripts/build-site.mjs",
     "start": "NODE_ENV=production node --env-file-if-exists=.env.local server/index.mjs",
     "test": "node --test tests/*.test.mjs tests/ui/*.test.mjs tests/evaluation/*.test.mjs",
     "test:worker": "node --test tests/worker.test.mjs tests/auth.test.mjs tests/data.test.mjs tests/admin.test.mjs",
@@ -19,7 +19,8 @@
     "test:evaluation": "node --test tests/evaluation/*.test.mjs",
     "eval:offline": "node scripts/evaluation-offline.mjs",
     "eval:live": "node --env-file-if-exists=.env.local scripts/evaluation-live.mjs",
-    "eval:modal": "node --env-file-if-exists=.env.local scripts/evaluation-modal.mjs"
+    "eval:modal": "node --env-file-if-exists=.env.local scripts/evaluation-modal.mjs",
+    "build:app": "vite build"
   },
   "engines": {
     "node": ">=22.0.0"
