@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {countryCodeSchema} from '../schema.mjs';
+import {chatTopics} from '../ai/topics.mjs';
 
 const countries = countryCodeSchema;
 const modes = z.enum(["before", "purchase", "client"]);
@@ -26,6 +27,7 @@ const statuses = z.enum([
   "billing_unknown",
   "blocked",
 ]);
+const topicSchema = z.enum(chatTopics);
 const safeName = z
   .string()
   .min(1)
@@ -128,6 +130,9 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
       ? { id: r.id, createdAt: r.created_at, expiresAt: r.expires_at }
       : null;
   }
+  async function revokeSession(sessionId) {
+    await run("DELETE FROM sessions WHERE id=?", [id.parse(sessionId)]);
+  }
   async function recordEvent(input) {
     const v = z
       .object({
@@ -159,12 +164,13 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
         mode: modes.nullish(),
         country: countries.nullish(),
         model: safeName.nullish(),
+        topic: topicSchema.optional(),
         status: statuses,
       })
       .strict()
       .parse(input);
     await run(
-      "INSERT INTO jobs(id,session_id,operation,mode,country,model,status,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      "INSERT INTO jobs(id,session_id,operation,mode,country,model,topic,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
       [
         v.id,
         v.sessionId ?? null,
@@ -172,6 +178,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
         v.mode ?? null,
         v.country ?? null,
         v.model ?? null,
+        v.topic ?? null,
         v.status,
         nowIso(clock),
       ],
@@ -429,6 +436,15 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
         `SELECT ${field} code,COUNT(*) jobs,COALESCE(SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END),0) succeeded,COALESCE(SUM(CASE WHEN status IN ('failed','billing_unknown') THEN 1 ELSE 0 END),0) failed FROM jobs WHERE created_at BETWEEN ? AND ? GROUP BY ${field}`,
         [from, to],
       );
+    const byChatTopic = await all(
+      `SELECT COALESCE(j.topic,'unclassified') AS topic,COUNT(*) AS queries,
+        COALESCE(SUM(CASE WHEN r.status='succeeded' THEN r.estimated_microusd ELSE 0 END),0) AS estimatedMicrousd,
+        COALESCE(SUM(CASE WHEN r.status IN ('running','billing_unknown') THEN r.ceiling_microusd ELSE 0 END),0) AS heldMicrousd
+        FROM jobs j LEFT JOIN ai_reservations r ON r.id=j.id
+        WHERE j.operation='chat' AND j.created_at BETWEEN ? AND ?
+        GROUP BY COALESCE(j.topic,'unclassified') ORDER BY queries DESC,topic ASC`,
+      [from, to],
+    );
     return {
       settings,
       usage: {
@@ -447,6 +463,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
       totals: { started: e.n, completed: j.completed, failed: j.failed },
       byCountry: await groups("country"),
       byMode: await groups("mode"),
+      byChatTopic,
     };
   }
   async function listJobs(input = {}) {
@@ -475,7 +492,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
       params,
     );
     const rows = await all(
-      `SELECT id,operation,mode,country,model,status,created_at AS createdAt,finished_at AS finishedAt,duration_ms AS durationMs,error_code AS errorCode,input_tokens AS inputTokens,output_tokens AS outputTokens,estimated_microusd AS estimatedMicrousd,(SELECT pricing_version FROM ai_reservations WHERE ai_reservations.id=jobs.id) AS pricingVersion FROM jobs WHERE ${where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`,
+      `SELECT id,operation,mode,country,model,topic,status,created_at AS createdAt,finished_at AS finishedAt,duration_ms AS durationMs,error_code AS errorCode,input_tokens AS inputTokens,output_tokens AS outputTokens,estimated_microusd AS estimatedMicrousd,(SELECT pricing_version FROM ai_reservations WHERE ai_reservations.id=jobs.id) AS pricingVersion,(SELECT ceiling_microusd FROM ai_reservations WHERE ai_reservations.id=jobs.id AND status IN ('running','billing_unknown')) AS heldMicrousd FROM jobs WHERE ${where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`,
       [...params, v.limit, v.offset],
     );
     return { items: rows, total: total.n };
@@ -576,6 +593,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
   return {
     createSession,
     getSession,
+    revokeSession,
     recordEvent,
     recordJob,
     finishJob,

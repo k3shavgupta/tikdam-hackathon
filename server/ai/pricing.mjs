@@ -1,7 +1,9 @@
 import prices from "./pricing.json" with { type: "json" };
+import basetenPrices from "./baseten-pricing.json" with { type: "json" };
 import { z } from "zod";
 
 export const verifiedPricing = prices;
+export const verifiedBasetenPricing = basetenPrices;
 export const aiError = (code, message, status = 503) =>
   Object.assign(new Error(message), { code, status });
 const integer = z.number().int().safe().nonnegative();
@@ -9,14 +11,14 @@ const priceSchema = z
   .object({
     version: z.string().regex(/^[A-Za-z0-9._-]+$/),
     checked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    model: z.literal("muse-spark-1.3"),
+    model: z.enum(["muse-spark-1.3", "meta-models/muse-spark-open-1026"]),
     mode: z.literal("standard"),
     inputUsdPerMillion: z.number().positive(),
     cachedInputUsdPerMillion: z.number().nonnegative(),
     outputUsdPerMillion: z.number().positive(),
     maxInputTokens: integer.positive().max(20000),
     maxOutputTokens: integer.min(16).max(1200),
-    preflightRequired: z.literal(true),
+    preflightRequired: z.boolean(),
     singleIterationOnly: z.literal(true),
     toolsAllowed: z.literal(false),
   })
@@ -24,7 +26,7 @@ const priceSchema = z
 
 export function validatePricing(pricing, model, clock = () => Date.now()) {
   const parsed = priceSchema.safeParse(pricing);
-  if (!parsed.success || parsed.data.model !== model)
+  if (!parsed.success || parsed.data.model !== model || parsed.data.preflightRequired !== (model === 'muse-spark-1.3'))
     throw aiError(
       "PRICING_UNVERIFIED",
       "AI pricing has not been verified for this model. Manual entry remains available.",

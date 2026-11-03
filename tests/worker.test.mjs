@@ -29,6 +29,20 @@ test('unknown API routes are JSON404 while app routes are SPA assets',async()=>{
  const r=await api.fetch(request('/api/missing'),env,{});assert.equal(r.status,404);assert.match(r.headers.get('content-type'),/json/);
  const page=await api.fetch(request('/coverage'),env,{});assert.match(await page.text(),/static app/);
 });
+test('landing, checker, and owner dashboard use their intended assets',async()=>{
+ const paths=[];
+ const assets={...env,ASSETS:{fetch:async request=>{
+  const path=new URL(request.url).pathname;paths.push(path);
+  return new Response(path,{headers:{'Content-Type':'text/html'}});
+ }}};
+ const owner=createHandler({adminVerifier:async()=>({subject:'owner',email:'owner@example.test'})});
+ for(const [route,asset] of [['/','/'],['/app','/app/index.html'],['/app/purchase','/app/index.html'],['/admin','/app/index.html']]){
+  const response=await owner.fetch(request(route),assets,{});
+  assert.equal(response.status,200);
+  assert.equal(await response.text(),asset);
+ }
+ assert.deepEqual(paths,['/','/app/index.html','/app/index.html','/app/index.html']);
+});
 test('cross-origin and unapproved-host mutations are blocked',async()=>{
  assert.equal((await api.fetch(request('/api/plan',facts,{Origin:'https://evil.test'}),env,{})).status,403);
  assert.equal((await api.fetch(new Request('https://alternate.workers.dev/api/config'),env,{})).status,403);
@@ -55,6 +69,15 @@ test('unreviewed country chat reaches the bounded assistant when AI controls are
  assert.equal(response.status,200);
  assert.deepEqual((await response.json()).sourceIds,[]);
  assert.equal(providerCalls,1);
+});
+test('chat-only rollout blocks invoice extraction before challenge or provider work',async()=>{
+ let verified=0,providerCalls=0;
+ const guarded=createHandler({repositoryFactory:()=>({...repository,getSettings:async()=>({aiEnabled:true})}),aiFactory:()=>{providerCalls++;return{extract:async()=>({})}},challengeVerifier:async()=>{verified++;}});
+ const response=await guarded.fetch(request('/api/extract',{consent:true,file:{name:'invoice.png',data:'data:image/png;base64,AA=='}},{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111','Idempotency-Key':crypto.randomUUID()}),{...env,AI_ENABLED:'true',AI_EXTRACTION_ENABLED:'false'},{});
+ assert.equal(response.status,503);
+ assert.equal((await response.json()).code,'AI_PAUSED');
+ assert.equal(verified,0);
+ assert.equal(providerCalls,0);
 });
 test('UI telemetry rejects arbitrary properties and invoice data',async()=>{
  const r=await api.fetch(request('/api/events',{id:crypto.randomUUID(),event:'workflow_started',mode:'purchase',country:'IN',invoiceNumber:'SECRET'},{Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111'}),env,{});
@@ -118,6 +141,8 @@ test('bundled Worker runs domain routes, sessions and metadata against actual lo
   const db=await fixture.getD1Database('DB');
   const sql=await readFile(new URL('../migrations/0001_operations.sql',import.meta.url),'utf8');
   await db.batch(sql.split(';').map(x=>x.trim()).filter(Boolean).map(x=>db.prepare(x)));
+  const topicMigration=await readFile(new URL('../migrations/0003_chat_topics.sql',import.meta.url),'utf8');
+  await db.batch(topicMigration.split(';').map(x=>x.trim()).filter(Boolean).map(x=>db.prepare(x)));
   const config=await fixture.dispatchFetch('https://tikdam.xyz/api/config');assert.equal(config.status,200);assert.equal((await config.json()).ai.enabled,false);
   const session=await fixture.dispatchFetch('https://tikdam.xyz/api/session',{method:'POST',headers:{Origin:'https://tikdam.xyz','Content-Type':'application/json'},body:'{}'});
   assert.equal(session.status,200);const cookie=session.headers.get('set-cookie').split(';')[0];
@@ -128,4 +153,58 @@ test('bundled Worker runs domain routes, sessions and metadata against actual lo
   for(const path of ['/admin','/api/admin/overview'])assert.equal((await fixture.dispatchFetch(`https://tikdam.xyz${path}`)).status,403);
   const unknown=await fixture.dispatchFetch('https://tikdam.xyz/api/not-a-route');assert.equal(unknown.status,404);assert.match(unknown.headers.get('content-type'),/json/);
  }finally{await fixture.dispose();}
+});
+
+test('provider changes require matching consent before challenge or model traffic',async()=>{
+ let reached=0;
+ const handler=createHandler({repositoryFactory:()=>({...repository,getSettings:async()=>({aiEnabled:true})}),challengeVerifier:async()=>{reached++;},aiFactory:()=>({chat:async()=>{reached++;return{provider:'Baseten'};}})});
+ const body={purpose:'intake',facts,history:[{role:'user',content:'A fictional laptop purchase'}]};
+ const baseHeaders={Cookie:'tikdam_session=11111111-1111-4111-8111-111111111111','Idempotency-Key':crypto.randomUUID()};
+ for(const header of [undefined,'meta']){
+  const response=await handler.fetch(request('/api/chat',body,{...baseHeaders,...(header?{'X-AI-Provider':header}:{})}),{...env,AI_ENABLED:'true',AI_PROVIDER:'baseten'},{});
+  assert.equal(response.status,409);assert.equal((await response.json()).code,'PROVIDER_CHANGED');
+ }
+ assert.equal(reached,0);
+ const response=await handler.fetch(request('/api/chat',body,{...baseHeaders,'X-AI-Provider':'baseten'}),{...env,AI_ENABLED:'true',AI_PROVIDER:'baseten'},{});
+ assert.equal(response.status,200);assert.equal(reached,2);
+ const oldBasetenTab=await handler.fetch(request('/api/chat',body,{...baseHeaders,'X-AI-Provider':'baseten'}),{...env,AI_ENABLED:'true',AI_PROVIDER:'meta'},{});
+ assert.equal(oldBasetenTab.status,409);
+ const config=await api.fetch(request('/api/config'),{...env,AI_PROVIDER:'baseten'},{});const data=await config.json();
+ assert.equal(data.provider,'Baseten');assert.equal(data.model,'meta-models/muse-spark-open-1026');
+});
+
+test('provider requests work in workerd and never follow a redirect with the API key', async () => {
+  const bundle = await build({
+    stdin: {resolveDir:new URL('../',import.meta.url).pathname,contents:`
+      import {createAiService} from './server/ai/service.mjs';
+      export default {async fetch(request,env){
+        const repository={
+          getSettings:()=>({aiEnabled:true}),reserveAiCall:()=>({admitted:true,reservationId:'fixture'}),
+          recordJob(){},finishJob(){},settleAiCall(){},updateSettings(){}
+        };
+        const service=createAiService({repository,env,clock:()=>Date.parse('2026-11-03T12:00:00Z'),
+          fetchImpl:(url,init)=>env.UPSTREAM.fetch(new Request(url,init))});
+        try{return Response.json(await service.chat(await request.json()));}
+        catch(error){return Response.json({code:error.code},{status:error.status||500});}
+      }};
+    `},bundle:true,write:false,format:'esm',platform:'browser',external:['node:*']
+  });
+  const urls=[];
+  const fixture=new Miniflare(convertV4MiniflareOptions({
+    modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-10-30',compatibilityFlags:['nodejs_compat'],
+    bindings:{AI_ENABLED:'true',AI_PROVIDER:'baseten',BASETEN_API_KEY:'fixture',SESSION_HMAC_SECRET:'synthetic-secret-at-least-32-bytes-for-test',TURNSTILE_SITE_KEY:'fixture',TURNSTILE_SECRET_KEY:'fixture'},
+    serviceBindings:{UPSTREAM:async request=>{
+      urls.push(request.url);
+      if(urls.length===2)return Response.redirect('https://other.invalid/',307);
+      return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({question:'What are you buying?',proposals:[],missingFields:['item'],sourceIds:[]})}}],usage:{prompt_tokens:500,completion_tokens:60,total_tokens:560}});
+    }}
+  }));
+  try {
+    const chat=()=>fixture.dispatchFetch('https://fixture.test/',{method:'POST',body:JSON.stringify({
+      sessionId:crypto.randomUUID(),requestId:crypto.randomUUID(),idempotencyKey:crypto.randomUUID(),purpose:'intake',facts,
+      history:[{role:'user',content:'Fictional stationery purchase'}]})});
+    assert.equal((await (await chat()).json()).provider,'Baseten');
+    assert.equal((await (await chat()).json()).code,'PROVIDER_UNAVAILABLE');
+    assert.deepEqual(urls,Array(2).fill('https://inference.baseten.co/v1/chat/completions'));
+  } finally {await fixture.dispose();}
 });

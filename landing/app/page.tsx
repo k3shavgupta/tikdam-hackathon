@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -10,7 +9,6 @@ import {
   ChevronDown,
   CircleHelp,
   FileCheck2,
-  Globe2,
   Menu,
   MessageCircleMore,
   ReceiptText,
@@ -81,27 +79,28 @@ const cases: Record<CaseId, DemoCase> = {
     id: "phone",
     title: "Mixed-use phone",
     jurisdiction: "India",
-    item: "Phone, 60% work use",
-    user: "Can I buy a phone and use it 60% for work?",
+    item: "Phone, about 60% work use",
+    user: "I’ll use a new phone about 60% for work. Can I claim 60% of its GST?",
     reply:
-      "Mixed business and personal use needs a separate attribution review. What is the invoice tax, and how will you document work use?",
-    verdict: "Conditional",
-    amount: "No amount",
-    amountLabel: "Current calculator does not cover this case",
+      "The 60% estimate is a starting fact, not an eligible amount. Confirm the invoice and registration, then record business use before seeking a credit review.",
+    verdict: "Insufficient information",
+    amount: "Check first",
+    amountLabel: "No phone GST credit estimated",
     explanation:
-      "Business use alone does not establish a claim. The current India numerical route is limited to ordinary office stationery with 100% business use.",
+      "The CGST Act limits mixed-use credit to tax attributable to business use, subject to other eligibility and blocked-credit rules. Tikdam's current amount route covers ordinary office stationery only, so this preview does not calculate a phone claim.",
     assumptions: [
-      "60% work use is your estimate",
-      "No invoice or registration facts supplied",
+      "60% work use is a self-reported estimate",
+      "No invoice, GST amount or registration details supplied",
     ],
     conditions: [
-      "Check item-specific treatment and any blocked-credit rules",
-      "Confirm registration, taxable activity, and the tax period",
+      "Confirm GST registration and taxable activity",
+      "Get a tax invoice showing the correct buyer and GST amount",
+      "Record actual business use and review apportionment and blocked-credit rules",
     ],
     documents: ["Tax invoice", "Work-use log", "Proof of payment"],
     source: {
-      label: "CBIC, CGST Act sections 16 and 17 (2021 text; check amendments)",
-      url: "https://cbic-gst.gov.in/pdf/CGST-Act-Updated-31082021.pdf",
+      label: "India Code, CGST Act sections 16 and 17 (check amendments for the purchase date)",
+      url: "https://www.indiacode.nic.in/indiacode/handle/123456789/15689?view_type=browse",
     },
   },
   missing: {
@@ -203,9 +202,36 @@ const cases: Record<CaseId, DemoCase> = {
 
 const nav = [
   { href: "#how", label: "How it works" },
-  { href: "#demo", label: "Demo" },
+  { href: "#demo", label: "Example cases" },
   { href: "#jurisdictions", label: "Jurisdictions" },
   { href: "#faq", label: "FAQ" },
+];
+
+const purchaseExamples = [
+  "PHONE",
+  "LAPTOP",
+  "CAMERA",
+  "SOFTWARE",
+  "DESK",
+  "MICROPHONE",
+  "MONITOR",
+  "KEYBOARD",
+  "PRINTER",
+  "WEBCAM",
+  "OFFICE CHAIR",
+  "HEADPHONES",
+  "TABLET",
+  "ROUTER",
+  "SCANNER",
+  "TRIPOD",
+  "LIGHTING",
+  "EXTERNAL DRIVE",
+  "CLOUD STORAGE",
+  "WEB HOSTING",
+  "DOMAIN NAME",
+  "DESIGN TOOLS",
+  "DRAWING TABLET",
+  "PROJECTOR",
 ];
 
 function Logo({ light = false }: { light?: boolean }) {
@@ -241,18 +267,38 @@ function Reveal({
   children: React.ReactNode;
   className?: string;
 }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={reduce ? false : { opacity: 0, y: 24 }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.18 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (
+      !element ||
+      !("IntersectionObserver" in window) ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      element.getBoundingClientRect().top <= window.innerHeight * 0.92
+    ) {
+      return;
+    }
+
+    element.classList.add("reveal-pending");
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          element.classList.add("reveal-visible");
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -5% 0px", threshold: 0.01 },
+    );
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      element.classList.remove("reveal-pending", "reveal-visible");
+    };
+  }, []);
+
+  return <div ref={ref} className={className}>{children}</div>;
 }
 
 function DemoReceipt({
@@ -262,39 +308,41 @@ function DemoReceipt({
   item: DemoCase;
   compact?: boolean;
 }) {
-  const reduce = useReducedMotion();
   return (
-    <motion.div
-      key={item.id + String(compact)}
-      className={`receipt ${compact ? "receipt-compact" : ""}`}
-      initial={reduce ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-    >
+    <div key={item.id + String(compact)} className={`receipt ${compact ? "receipt-compact" : "receipt-demo"}`}>
       <div className="receipt-top">
         <span>
           <ReceiptText size={17} aria-hidden="true" /> Tikdam check
         </span>
         <span>Example only</span>
       </div>
-      <div className="receipt-meta">
-        <span>Jurisdiction</span>
-        <strong>{item.jurisdiction}</strong>
-        <span>Item</span>
-        <strong>{item.item}</strong>
-      </div>
-      <div className="receipt-dash" />
-      <div className="chat-line chat-user">
-        <span className="chat-avatar">You</span>
-        <p>{item.user}</p>
-      </div>
-      <div className="chat-line chat-bot">
-        <span className="chat-avatar">
-          <Logo />
-        </span>
-        <p>{item.reply}</p>
-      </div>
-      <div className="receipt-dash" />
+      {compact ? (
+        <>
+          <div className="receipt-meta">
+            <span>Jurisdiction</span>
+            <strong>{item.jurisdiction}</strong>
+            <span>Item</span>
+            <strong>{item.item}</strong>
+          </div>
+          <div className="receipt-dash" />
+          <div className="chat-line chat-user">
+            <span className="chat-avatar">You</span>
+            <p>{item.user}</p>
+          </div>
+          <div className="chat-line chat-bot">
+            <span className="chat-avatar">
+              <Logo />
+            </span>
+            <p>{item.reply}</p>
+          </div>
+          <div className="receipt-dash" />
+        </>
+      ) : (
+        <>
+          <p className="receipt-demo-context">{item.jurisdiction} / {item.item}</p>
+          <blockquote className="receipt-demo-question">{item.user}</blockquote>
+        </>
+      )}
       <div className="receipt-result">
         <span
           className={`verdict verdict-${item.verdict.toLowerCase().replaceAll(" ", "-")}`}
@@ -303,54 +351,59 @@ function DemoReceipt({
         </span>
         <p className="receipt-amount">{item.amount}</p>
         <p className="amount-label">{item.amountLabel}</p>
-        <p className="receipt-explanation">{item.explanation}</p>
       </div>
       {!compact && (
         <>
-          <div className="receipt-dash" />
-          <div className="receipt-details">
-            <div>
-              <h4>Assumptions</h4>
-              <ul>
-                {item.assumptions.map((a) => (
-                  <li key={a}>{a}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4>Check before claiming</h4>
-              <ul>
-                {item.conditions.map((c) => (
-                  <li key={c}>{c}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4>Keep this proof</h4>
-              <ul>
-                {item.documents.map((d) => (
-                  <li key={d}>
-                    <Check size={15} aria-hidden="true" />
-                    {d}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="receipt-demo-answer">
+            <span>What the preview says</span>
+            <p>{item.reply}</p>
           </div>
-          <div className="receipt-source">
-            {item.source ? (
-              <a href={item.source.url} target="_blank" rel="noreferrer">
-                Read source: {item.source.label}{" "}
-                <ArrowUpRight size={16} aria-hidden="true" />
-              </a>
-            ) : (
-              <span>No country rule or source is applied to this example.</span>
-            )}
-          </div>
+          <details className="receipt-more">
+            <summary>
+              {item.source ? "See the checks and source" : "See checks and limits"}
+              <ChevronDown size={18} aria-hidden="true" />
+            </summary>
+            <div className="receipt-more-content">
+              <p className="receipt-explanation">{item.explanation}</p>
+              <div className="receipt-details">
+                <div>
+                  <h4>Assumptions</h4>
+                  <ul>
+                    {item.assumptions.map((a) => <li key={a}>{a}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Check before claiming</h4>
+                  <ul>
+                    {item.conditions.map((c) => <li key={c}>{c}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h4>Keep this proof</h4>
+                  <ul>
+                    {item.documents.map((d) => (
+                      <li key={d}>
+                        <Check size={15} aria-hidden="true" /> {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="receipt-source">
+                {item.source ? (
+                  <a href={item.source.url} target="_blank" rel="noreferrer">
+                    Read source: {item.source.label} <ArrowUpRight size={16} aria-hidden="true" />
+                  </a>
+                ) : (
+                  <span>No country rule or source is applied to this example.</span>
+                )}
+              </div>
+            </div>
+          </details>
         </>
       )}
       <div className="receipt-teeth" aria-hidden="true" />
-    </motion.div>
+    </div>
   );
 }
 
@@ -358,14 +411,6 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState<CaseId>("stationery");
   const item = cases[selected];
-  const chooseJurisdiction = (value: string) =>
-    setSelected(
-      value === "India"
-        ? "stationery"
-        : value === "United Kingdom"
-          ? "uk"
-          : "wrong",
-    );
 
   return (
     <>
@@ -383,9 +428,10 @@ export default function Home() {
                 {link.label}
               </a>
             ))}
+            <a href="/app/sign-in">Sign in</a>
           </nav>
           <a className="button button-lime nav-cta" href="/app">
-            Open app <ArrowUpRight size={17} aria-hidden="true" />
+            Open checker <ArrowUpRight size={17} aria-hidden="true" />
           </a>
           <button
             className="menu-button"
@@ -415,8 +461,9 @@ export default function Home() {
               </a>
             ))}
             <a href="/app" onClick={() => setMenuOpen(false)}>
-              Open app <ArrowUpRight size={17} aria-hidden="true" />
+              Open checker <ArrowUpRight size={17} aria-hidden="true" />
             </a>
+            <a href="/app/sign-in" onClick={() => setMenuOpen(false)}>Sign in <ArrowUpRight size={17} aria-hidden="true" /></a>
           </nav>
         )}
       </header>
@@ -474,14 +521,18 @@ export default function Home() {
 
         <div
           className="marquee"
-          aria-label="Purchase examples: phone, laptop, camera, software, desk, microphone"
+          role="group"
+          aria-label="Examples of purchases people may ask about"
         >
           <div className="marquee-track" aria-hidden="true">
-            {Array.from({ length: 2 }, (_, i) => (
-              <span key={i}>
-                PHONE <b>✳</b> LAPTOP <b>✳</b> CAMERA <b>✳</b> SOFTWARE{" "}
-                <b>✳</b> DESK <b>✳</b> MICROPHONE <b>✳</b>
-              </span>
+            {[0, 1].map((copy) => (
+              <div className="marquee-set" key={copy}>
+                {purchaseExamples.map((item) => (
+                  <span key={item}>
+                    {item} <b>✳</b>
+                  </span>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -554,59 +605,21 @@ export default function Home() {
               <div>
                 <span className="section-index">Try a case</span>
                 <h2 id="demo-title">
-                  The answer looks
+                  See the check.
                   <br />
-                  better with the <em>receipts.</em>
+                  Keep the <em>receipts.</em>
                 </h2>
               </div>
               <p>
-                Tap a case and watch the preview change. This front-end
-                illustration uses fixed examples. It does not call Meta or the
-                live tax engine.
+                Choose an example to see the kind of answer Tikdam gives.
+                These are fixed illustrations, not live checks.
               </p>
             </Reveal>
             <div className="demo-grid">
               <div className="demo-controls">
-                <label className="selector-label" htmlFor="jurisdiction">
-                  Selected jurisdiction
-                </label>
-                <div className="select-wrap">
-                  <Globe2 size={19} aria-hidden="true" />
-                  <select
-                    id="jurisdiction"
-                    value={item.jurisdiction}
-                    onChange={(event) => chooseJurisdiction(event.target.value)}
-                  >
-                    <option>India</option>
-                    <option>United Kingdom</option>
-                    <option>Canada</option>
-                  </select>
-                  <ChevronDown size={17} aria-hidden="true" />
-                </div>
-                <div className="coverage-key">
-                  <span>
-                    <i className="key-dot key-active" /> India: narrow active
-                    route
-                  </span>
-                  <span>
-                    <i className="key-dot key-preview" /> UK: preview example
-                  </span>
-                  <span>
-                    <i className="key-dot key-off" /> Other cases: unsupported
-                  </span>
-                </div>
-                <p className="case-label">Pick a test case</p>
+                <h3 className="case-label">Choose an example</h3>
                 <div className="case-list">
-                  {(
-                    [
-                      "stationery",
-                      "phone",
-                      "missing",
-                      "personal",
-                      "wrong",
-                      "uk",
-                    ] as CaseId[]
-                  ).map((id, n) => (
+                  {(["stationery", "phone", "missing"] as CaseId[]).map((id) => (
                     <button
                       className={`case-button ${selected === id ? "case-button-active" : ""}`}
                       key={id}
@@ -614,43 +627,36 @@ export default function Home() {
                       onClick={() => setSelected(id)}
                       aria-pressed={selected === id}
                     >
-                      <span className="case-num">0{n + 1}</span>
-                      <span>
-                        {cases[id].title}
-                        <small>{cases[id].jurisdiction}</small>
-                      </span>
+                      <span>{cases[id].title}</span>
                       <ArrowUpRight size={18} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
-                <p className="demo-hint">
-                  <ShieldCheck size={18} aria-hidden="true" /> A result can say
-                  “I don’t have enough information.”
-                </p>
+                <details className="more-cases">
+                  <summary>
+                    More examples <span>3</span> <ChevronDown size={18} aria-hidden="true" />
+                  </summary>
+                  <div className="case-list">
+                    {(["personal", "wrong", "uk"] as CaseId[]).map((id) => (
+                      <button
+                        className={`case-button ${selected === id ? "case-button-active" : ""}`}
+                        key={id}
+                        type="button"
+                        onClick={() => setSelected(id)}
+                        aria-pressed={selected === id}
+                      >
+                        <span>{cases[id].title}<small>{cases[id].jurisdiction}</small></span>
+                        <ArrowUpRight size={18} aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                </details>
               </div>
               <div className="demo-display">
-                <div className="demo-display-head">
-                  <span>Interactive preview</span>
-                  <span className="demo-live-dot">Fixed example</span>
-                </div>
                 <p className="sr-only" aria-live="polite">
                   {item.title}: {item.verdict}. {item.amountLabel}.
                 </p>
                 <DemoReceipt item={item} />
-                <div className="status-legend">
-                  <span>
-                    <i className="legend-green" /> Eligible
-                  </span>
-                  <span>
-                    <i className="legend-amber" /> Conditional
-                  </span>
-                  <span>
-                    <i className="legend-red" /> Not eligible
-                  </span>
-                  <span>
-                    <i className="legend-ink" /> Unsupported
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -812,9 +818,9 @@ export default function Home() {
                 <span className="build-marker">Existing app</span>
                 <h3>Indian prototype, now broader but still bounded</h3>
                 <p>
-                  The current app has a narrow India GST amount route and
-                  guarded international guidance. The public AI switch is off
-                  pending its controls.
+                  The current checker offers a narrow India GST amount route
+                  and general preparation across 250 locations. Public chat
+                  requires consent and verification; invoice reading is paused.
                 </p>
               </div>
               <div>
@@ -829,7 +835,7 @@ export default function Home() {
                 </p>
               </div>
               <a href="/app">
-                Open the current app{" "}
+                Open the full checker{" "}
                 <ArrowUpRight size={17} aria-hidden="true" />
               </a>
             </Reveal>
@@ -928,12 +934,12 @@ export default function Home() {
             </a>
           </nav>
           <a className="button button-lime" href="/app">
-            Open app <ArrowUpRight size={18} aria-hidden="true" />
+            Open checker <ArrowUpRight size={18} aria-hidden="true" />
           </a>
         </div>
         <div className="container footer-bottom">
           <span>© 2026 Tikdam</span>
-          <a href="/brand/tikdam-logos.zip" download>Download logos</a>
+          <span>Built with care, and a paper trail.</span>
           <a href="#top">Back to top ↑</a>
         </div>
       </footer>

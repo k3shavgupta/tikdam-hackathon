@@ -9,6 +9,9 @@ import { countries, getCoverage, indiaCheckDefinitions, clientSources } from "./
 import { planPurchase, assess } from "./domain.mjs";
 import { factsSchema } from "./schema.mjs";
 import { createMetaClient } from "./meta.mjs";
+import { clerkConfig } from './clerk-config.mjs';
+import { requireCustomer } from '../worker/customer-auth.mjs';
+import { securityHeaders } from '../worker/http.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export function createApp({
   meta = createMetaClient(),
@@ -55,6 +58,23 @@ export function createApp({
     next();
   });
   app.use("/api", express.json({ limit: "9mb", strict: true }));
+  app.use((req,res,next)=>{
+    if(process.env.NODE_ENV==='production' && /^\/app(?:\/|$)/.test(req.path)){
+      res.set('Content-Security-Policy',securityHeaders(new Response(null),{clerkOrigin:clerkConfig(process.env).frontendOrigin}).headers.get('Content-Security-Policy'));
+    }
+    next();
+  });
+  app.get('/api/auth/config',(req,res)=>{
+    const {enabled,publishableKey}=clerkConfig(process.env);
+    res.json({enabled,publishableKey});
+  });
+  app.get('/api/account',async(req,res)=>{
+    try{
+      const origin=`${req.protocol}://${req.headers.host}`;
+      const request=new Request(`${origin}/api/account`,{headers:req.headers});
+      res.json(await requireCustomer(request,{...process.env,APP_ORIGINS:origin}));
+    }catch(error){res.status(error.status||503).json({code:error.code||'AUTH_UNAVAILABLE',message:error.message});}
+  });
   const buckets = new Map();
   app.use("/api/extract", (req, res, next) => {
     const now = Date.now(),

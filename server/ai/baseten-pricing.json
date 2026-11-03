@@ -1,0 +1,17 @@
+{
+  "version": "baseten-hackathon-2026-11-03.1",
+  "checked": "2026-11-03",
+  "model": "meta-models/muse-spark-open-1026",
+  "mode": "standard",
+  "inputUsdPerMillion": 1.25,
+  "cachedInputUsdPerMillion": 0.15,
+  "outputUsdPerMillion": 4.25,
+  "maxInputTokens": 20000,
+  "maxOutputTokens": 1200,
+  "preflightRequired": false,
+  "singleIterationOnly": true,
+  "toolsAllowed": false,
+  "sources": ["https://inference.baseten.co/v1/models", "https://docs.baseten.co/inference/model-apis/pricing-and-limits"],
+  "basis": "Use the published Muse Spark Open rates as a conservative usage estimate for the hackathon alias specified in the owner's invitation. The invitation grants credits; their remaining balance and final billing are not independently verified. No cache discount is assumed.",
+  "limitations": "Text only. Bound UTF-8 request content plus 4096 tokens of framing allowance before admission, reserve the full 20000-input/1200-output ceiling, validate returned usage, and hold the reservation and pause on unknown or excessive usage. No retries, fallback, tools or media. This estimate is not a provider invoice."
+}

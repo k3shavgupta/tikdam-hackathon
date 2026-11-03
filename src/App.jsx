@@ -3,6 +3,8 @@ import {api as requestApi, ensureSession, sendEvent, resetSession} from "./api.m
 import {AssistantPanel} from "./components/AssistantPanel.jsx";
 import {FeedbackPanel} from "./components/FeedbackPanel.jsx";
 import {TurnstileChallenge} from "./components/TurnstileChallenge.jsx";
+import {QuickSetup} from './components/QuickSetup.jsx';
+import {AccountControls} from './auth/CustomerAuth.jsx';
 const defaults = {
   mode: "before",
   country: "IN",
@@ -79,8 +81,19 @@ function Sources({ sources = [] }) {
     </details>
   );
 }
+function updateFacts(facts, changes, countries) {
+  const next = {...facts, invoiceConfirmed: false};
+  if (changes.country && changes.country !== facts.country) {
+    next.currency = countries.find(country => country.code === changes.country)?.currency || '';
+    if (facts.businessCountry === facts.country) next.businessCountry = changes.country;
+  }
+  return {...next, ...changes};
+}
+
 export default function App() {
   const [config, setConfig] = useState(null),
+    [setupComplete,setSetupComplete] = useState(false),
+    [detailsOpen,setDetailsOpen] = useState(false),
     [facts, setFacts] = useState(defaults),
     [page, setPage] = useState("work"),
     [result, setResult] = useState(null),
@@ -98,13 +111,15 @@ export default function App() {
   const fileRef = useRef(null),
     heading = useRef(null),
     generation = useRef(0);
-  useEffect(() => {
+  function loadConfig() {
+    setError("");
     api("config")
       .then((c)=>{setConfig(c);ensureSession().catch(()=>{});})
       .catch(() =>
-        setError("The app server is unavailable. Refresh after restarting it."),
+        setError("Tikdam couldn’t load the checker. Check your connection and try again."),
       );
-  }, []);
+  }
+  useEffect(loadConfig, []);
   useEffect(
     () => () => {
       if (preview) URL.revokeObjectURL(preview);
@@ -116,17 +131,22 @@ export default function App() {
       heading.current?.focus({ preventScroll: true });
   }, [result, page]);
   const country = config?.countries.find((c) => c.code === facts.country);
+  function startConversation(setup){
+    generation.current++;
+    setFacts(f=>({...f,...setup,currency:config.countries.find(c=>c.code===setup.country)?.currency||'',invoiceConfirmed:false}));
+    setSetupComplete(true);setDetailsOpen(false);setResult(null);setError('');
+    sendEvent('workflow_started',setup.mode,setup.country);
+  }
+  useEffect(()=>{
+    if(setupComplete) document.getElementById('tk-assistant-title')?.focus();
+  },[setupComplete]);
+  function reviewDetails(){setResult(null);setDetailsOpen(true);}
+  useEffect(()=>{if(detailsOpen){const panel=document.getElementById('review-details');panel?.focus({preventScroll:true});panel?.scrollIntoView?.({behavior:'instant',block:'start'});}},[detailsOpen,result]);
+  useEffect(()=>{if(result)document.querySelector('.result-main')?.scrollIntoView?.({behavior:'instant',block:'start'});},[result]);
   function edit(key, value) {
     generation.current++;
     setBusy("");
-    setFacts((f) => {
-      const next = {...f, [key]: value, invoiceConfirmed: key === "invoiceConfirmed" ? value : false};
-      if (key === 'country') {
-        next.currency = config?.countries.find(c => c.code === value)?.currency || '';
-        if (f.businessCountry === f.country) next.businessCountry = value;
-      }
-      return next;
-    });
+    setFacts(f => updateFacts(f, {[key]: value}, config.countries));
     setResult(null);
     setError("");
     setNotice("");
@@ -134,7 +154,10 @@ export default function App() {
   function applyProposals(proposals){
     const allowed=new Set(["mode","country","businessCountry","item","category","businessUse","currency","taxResidence","workCountry"]);
     generation.current++;
-    setFacts(f=>({...f,...Object.fromEntries(Object.entries(proposals).filter(([k])=>allowed.has(k))),invoiceConfirmed:false}));
+    const changes=Object.fromEntries(Object.entries(proposals).filter(([key])=>allowed.has(key)));
+    setBusy("");
+    setError("");
+    setFacts(f=>updateFacts(f,changes,config.countries));
     setResult(null);setNotice("Suggested fields applied. Review them before continuing.");
   }
   function selectMode(mode) {
@@ -148,7 +171,7 @@ export default function App() {
     setNotice("");
   }
   function clear() {
-    resetSession().catch(()=>{});
+    resetSession().catch(()=>setError("Your details were cleared here. Reconnect and choose Clear session again to close the server session."));
     setSessionVersion(x=>x+1);
     setChallengeToken("");setChallengeReset(x=>x+1);
     generation.current++;
@@ -164,6 +187,7 @@ export default function App() {
     setNotice("");
     if (fileRef.current) fileRef.current.value = "";
     setPage("work");
+    setSetupComplete(false);setDetailsOpen(false);
   }
   async function run() {
     setError("");
@@ -435,14 +459,18 @@ export default function App() {
   return (
     <>
       <a className="skip" href="#main">
-        Skip to Tikdam
+        Skip to purchase check
       </a>
-      <header className="checker-header">
-        <a className="brand" href="/" aria-label="Tikdam homepage">
-          <img src="/brand/logo.svg" alt="Tikdam" width="147" height="34" />
+      <header>
+        <a
+          className="brand"
+          href="/"
+          aria-label="Tikdam home"
+        >
+          <img src="/brand/logo.svg" alt="Tikdam" />
         </a>
-        <nav aria-label="Checker navigation">
-          <button aria-current={page === "work" ? "page" : undefined} onClick={() => setPage("work")}>My check</button>
+        <nav>
+          <a className="home-link" href="/">Home</a>
           <button onClick={() => setPage("coverage")}>
             Coverage & sources
           </button>
@@ -450,11 +478,12 @@ export default function App() {
           <button className="reset" onClick={clear}>
             Clear session
           </button>
+          <AccountControls />
         </nav>
       </header>
       <main id="main">
         {!config ? (
-          <div className="loading">{error || "Loading Tikdam…"}</div>
+          <div className="loading"><p role="status">{error || "Loading Tikdam…"}</p>{error && <button className="secondary" onClick={loadConfig}>Try again</button>}</div>
         ) : (
           <>
             {page === "coverage" ? (
@@ -489,13 +518,14 @@ export default function App() {
               </>
             ) : page === "privacy" ? (
               <article className="privacy-page">
+                <p>Optional accounts are managed by Clerk, which processes your sign-in and account details. Tikdam verifies your account session but does not save checks or conversations to your account yet. Clear session clears your working check; use the account menu to sign out.</p>
                 <h1 tabIndex={-1} ref={heading}>
                   Your invoice, your choice.
                 </h1>
                 <p>
                   Tikdam keeps no stored copy of bills or profiles on this
                   server. The working session lives in your browser memory and
-                  clears on reload or “Clear session”. We retain minimal operational metadata, such as workflow country, processing status, timestamps and model usage, with daily cleanup eligibility after 30 days. Explicit feedback becomes eligible for cleanup after 90 days. Processing a backlog can take longer. A minimal spending ledger is retained to enforce the campaign budget. It contains no invoice contents. Cloudflare and Meta have their own service terms.
+                  clears on reload or “Clear session”. We retain minimal operational metadata, such as workflow country, a broad chat topic label, processing status, timestamps and model usage, with daily cleanup eligibility after 30 days. We do not save chat question text in those records. Explicit feedback becomes eligible for cleanup after 90 days. Processing a backlog can take longer. A minimal spending ledger is retained to enforce the campaign budget. It contains no invoice contents. Cloudflare and the selected AI provider have their own service terms.
                 </p>
                 <h2>When you ask Muse to read a bill</h2>
                 <p>
@@ -511,7 +541,7 @@ export default function App() {
                   invoice to Meta. A downloaded review pack contains the invoice
                   facts you entered and should be kept securely.
                 </p>
-                <p>Asking the assistant sends the conversation and entered form facts to Meta only after your consent and an explicit request. Invoice selection alone does not upload a file. Clearing the session resets browser fields and the anonymous session cookie; retained operational records follow the periods above. Feedback is optional. Avoid private identifiers in feedback.</p>
+                <p>Asking the assistant sends the conversation and entered form facts to {config.provider === 'Baseten' ? 'Baseten' : 'Meta'} only after your consent and an explicit request. Invoice selection alone does not upload a file. Clearing the session resets browser fields and the anonymous session cookie; retained operational records follow the periods above. Feedback is optional. Avoid private identifiers in feedback.</p>
                 <a
                   href="https://dev.meta.ai/legal/terms-of-service"
                   target="_blank"
@@ -523,63 +553,61 @@ export default function App() {
                   Back to my check
                 </button>
               </article>
+            ) : !setupComplete ? (
+              <QuickSetup facts={facts} countries={config.countries} coverage={config.coverage} modes={modes} onStart={startConversation}/>
             ) : (
               <>
-                {result ? (
-                  <div className="intro compact">
+                <div className="intro chat-intro">
+                  <div>
+                    <div className="eyebrow">
+                      <span className="mini-dot" />
+                      Your Tikdam check
+                    </div>
+                    <h1>
+                      {result ? (
+                        "A clearer next step."
+                      ) : (
+                        <>
+                          Let’s work it out.
+                        </>
+                      )}
+                    </h1>
+                    <p>
+                      {result
+                        ? "Review the route, the evidence and what to do next."
+                        : "Tell Tikdam what happened or what you’re planning. We’ll take it one question at a time."}
+                    </p>
+                    {!result && <p className="app-scope">Choose from {config.countries.length} locations. Local tax guidance is reviewed for 11; numerical checks cover narrow India, UK and Singapore cases.</p>}
+                  </div>
+                  <div className="model-status">
+                    <span
+                      className={
+                        config.ai?.chatAvailable || config.modelConfigured ? "connected-dot" : "offline-dot"
+                      }
+                    />
                     <div>
-                      <h1>Your check.</h1>
-                      <p>Review the route, the evidence and what to do next.</p>
+                      {config.ai?.chatAvailable ? "Ask Tikdam available" : config.modelConfigured ? "Muse Spark available" : "Manual checks available"}
+                      <small>{config.ai?.chatAvailable && !config.modelConfigured ? "Chat is available. AI bill reading is paused; enter invoice details manually." : config.modelConfigured ? "Documents sent only with your permission" : config.ai?.reason || "AI is paused; manual checks and examples work now"}</small>
                     </div>
                   </div>
-                ) : (
-                  <section className="landing-hero" aria-labelledby="landing-title">
-                    <div className="hero-copy">
-                      <h1 id="landing-title">Your tax <span>workbench.</span></h1>
-                      <p className="hero-lede">Plan a purchase, review a bill, or check what a client paid you.</p>
-                      <details className="scope-details">
-                        <summary>What can I check here?</summary>
-                        <p>For businesses anywhere, choose from {config.countries.length} countries and territories. Eleven have reviewed guidance. India’s conditional GST estimate covers ordinary office stationery under specific conditions. Tikdam does not check GST portals or file claims.</p>
-                      </details>
-                    </div>
-                    <aside className="session-slip" aria-label="Current check summary">
-                      <div className="slip-title"><img src="/brand/icon.svg" alt="" width="24" height="24"/> Current check</div>
-                      <dl><div><dt>Task</dt><dd>{modes.find(([id]) => id === facts.mode)?.[1]}</dd></div>
-                      <div><dt>Jurisdiction</dt><dd>{country?.name || facts.country}</dd></div></dl>
-                    </aside>
-                  </section>
-                )}
-                {!result && (
-                  <section id="workflow" className="workflow-start" aria-labelledby="workflow-title">
-                    <div className="workflow-heading">
-                      <h2 id="workflow-title">Choose your task</h2>
-                      <div className="model-status">
-                        <span className={config.modelConfigured ? "connected-dot" : "offline-dot"} />
-                        <div>
-                          {config.modelConfigured ? "Muse Spark available" : "Manual checks available"}
-                          <small>{config.modelConfigured ? "Documents sent only with your permission" : "AI bill reading is paused. You can still enter details manually."}</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mode-tabs" role="group" aria-label="Choose your task">
-                    {modes.map(([id, title, desc, icon]) => (
-                      <button
-                        key={id}
-                        className={facts.mode === id ? "selected" : ""}
-                        aria-pressed={facts.mode === id}
-                        onClick={() => selectMode(id)}
-                      >
-                        <span className="mode-icon" aria-hidden="true">{icon}</span>
-                        <span>
-                          <strong>{title}</strong>
-                          <small>{desc}</small>
-                        </span>
-                        <span className="radio-dot" aria-hidden="true" />
-                      </button>
-                    ))}
-                    </div>
-                  </section>
-                )}
+                </div>
+                <div className="chat-layout">
+                  <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals} conversational onReview={reviewDetails}/>
+                  <aside className="conversation-receipt" aria-labelledby="check-details-title">
+                    <div className="receipt-heading"><img src="/brand/icon.svg" alt=""/><h2 id="check-details-title">Your check so far</h2></div>
+                    <dl>
+                      <div><dt>Task</dt><dd>{modes.find(m=>m[0]===facts.mode)?.[1]}</dd></div>
+                      <div><dt>{facts.mode==='client'?'Payment from':'Purchase in'}</dt><dd>{country?.name}</dd></div>
+                      <div><dt>Business based in</dt><dd>{config.countries.find(c=>c.code===facts.businessCountry)?.name}</dd></div>
+                      <div><dt>{facts.mode==='client'?'Work or service':'Purchase'}</dt><dd>{facts.item||'Tell us in the chat'}</dd></div>
+                    </dl>
+                    <p>Chat suggestions are added only when you apply them. Review the details before checking an amount.</p>
+                    <button className="secondary" onClick={reviewDetails} aria-expanded={detailsOpen} aria-controls="review-details">Review details</button>
+                    {facts.mode==='before'&&<button className="primary" onClick={run} disabled={Boolean(busy)}>{busy?'Checking…':'Build my buying checklist'}</button>}
+                    <details className="change-task"><summary>Change task</summary>{modes.map(([id,title])=><button key={id} aria-pressed={facts.mode===id} onClick={()=>selectMode(id)}>{title}</button>)}</details>
+                    <small>Rules determine supported amounts. No automatic filings.</small>
+                  </aside>
+                </div>
                 {result ? (
                   <div className="result-layout">
                     <article className="result-main">
@@ -598,7 +626,7 @@ export default function App() {
                               ? "Conditional estimate"
                               : "Review needed"}
                         </span>
-                        <button onClick={() => setResult(null)}>
+                        <button onClick={reviewDetails}>
                           Edit answers
                         </button>
                       </div>
@@ -773,8 +801,9 @@ export default function App() {
                     </aside>
                   </div>
                 ) : (
-                  <div className="workspace">
+                  <div className="workspace" id="review-details" tabIndex={-1} hidden={!detailsOpen}>
                     <section className="work-main">
+                      <button className="back-to-chat" onClick={()=>{setDetailsOpen(false);document.getElementById('tk-assistant-title')?.focus();}}>Back to conversation ↑</button>
                       <div className="section-heading">
                         <span className="iconbox">
                           {facts.mode === "before" ? "↗" : "▤"}
@@ -878,7 +907,8 @@ export default function App() {
                               >
                                 {busy === "Reading bill"
                                   ? "Reading bill…"
-                                  : "Read with Muse"}
+                                  : "Read with Muse"}{" "}
+                                <span>✦</span>
                               </button>
                               {consent&&config.modelConfigured&&<TurnstileChallenge siteKey={config.turnstileSiteKey} action="extract" onToken={setChallengeToken} resetKey={challengeReset}/>}
                               {!config.modelConfigured && (
@@ -1118,8 +1148,6 @@ export default function App() {
                           )}
                         </div>
                       )}
-                    </section>
-                    {profile()}
                       <div className="form-end">
                         <button
                           className="primary"
@@ -1139,16 +1167,16 @@ export default function App() {
                             : "Review facts first. Eligibility depends on the applicable rules."}
                         </p>
                       </div>
-
+                    </section>
+                    {profile()}
                   </div>
                 )}
-                <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals}/>
-                <FeedbackPanel key={`feedback-${sessionVersion}`} mode={facts.mode} country={facts.country}/>
+                {result&&<FeedbackPanel key={`feedback-${sessionVersion}`} mode={facts.mode} country={facts.country}/>}
               </>
             )}
           </>
         )}
-        {error && (
+        {config && error && (
           <div className="message error" role="alert">
             {error}
           </div>
@@ -1159,7 +1187,7 @@ export default function App() {
           </div>
         )}
         <footer>
-          <a href="/brand/tikdam-logos.zip" download>Download Tikdam logos</a>
+          <span>Clear facts. Better prepared.</span>
           <span>Estimates for review. No automatic filings.</span>
         </footer>
       </main>

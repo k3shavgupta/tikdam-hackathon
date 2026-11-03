@@ -4,6 +4,15 @@ import assert from "node:assert/strict";
 import { createAiService } from "../server/ai/service.mjs";
 import { createChatPayload, parseChatResult } from "../server/ai/schemas.mjs";
 import { verifiedPricing } from "../server/ai/pricing.mjs";
+import { classifyChatTopic } from "../server/ai/topics.mjs";
+
+test('chat topics use fixed labels without retaining a question or identifier', () => {
+  const input={purpose:'intake',facts:{mode:'before'},history:[{role:'user',content:'Is seller GSTIN 22ABCDE1234F1Z5 valid?'}]};
+  assert.equal(classifyChatTopic(input),'seller_verification');
+  assert.equal(classifyChatTopic({...input,purpose:'explain'}),'result_explanation');
+  assert.equal(classifyChatTopic({...input,history:[{role:'user',content:'A private name and number 12345'}]}),'other');
+  assert.equal(JSON.stringify(classifyChatTopic(input)).includes('22ABCDE'),false);
+});
 
 test("client explanation cannot select purchase VAT guidance", () => {
   const pack = createChatPayload({
@@ -54,6 +63,7 @@ test("purchase intake ignores client-payment clarification fields", () => {
 const now = () => Date.parse("2026-11-01T12:00:00Z");
 const env = {
   AI_ENABLED: "true",
+  AI_EXTRACTION_ENABLED: "true",
   META_MODEL_API_KEY: "synthetic-key",
   SESSION_HMAC_SECRET: "synthetic-private-hmac-secret-over-32-bytes",
   TURNSTILE_SITE_KEY: "public-test",
@@ -166,6 +176,23 @@ test("paused or denied budget and idempotency paths never reach provider", async
     () => f.service.chat(f.request),
     (e) => e.code === "AI_PAUSED",
   );
+  assert.equal(f.calls.length, 0);
+});
+test("chat can be available while invoice extraction remains paused", async () => {
+  const f = fixture();
+  const service = createAiService({
+    env: { ...env, AI_EXTRACTION_ENABLED: "false" },
+    repository: f.repo,
+    clock: now,
+    fetchImpl: async () => { throw Error("provider must not be called"); },
+  });
+  assert.deepEqual(await service.capabilities(), {
+    enabled: true,
+    chatAvailable: true,
+    extractionAvailable: false,
+    reason: null,
+  });
+  await assert.rejects(() => service.extract({}), (error) => error.code === "AI_PAUSED");
   assert.equal(f.calls.length, 0);
 });
 test("missing pricing or database controls fail closed", async () => {
@@ -369,4 +396,61 @@ test('small-budget AI requests explicitly choose minimal reasoning for both coun
  const f=fixture();await f.service.chat(f.request);
  assert.deepEqual(f.calls[1][1].reasoning,{effort:'minimal'});
  assert.deepEqual(f.calls[2][1].reasoning,{effort:'minimal'});
+});
+
+function basetenFixture({response, code=200, customEnv={}}={}) {
+ const f=fixture(); const sends=[];
+ const service=createAiService({env:{...env,AI_PROVIDER:'baseten',BASETEN_API_KEY:'synthetic-baseten',...customEnv},repository:f.repo,clock:()=>Date.parse('2026-11-03T12:00:00Z'),fetchImpl:async(url,options)=>{
+  sends.push({url,body:JSON.parse(options.body),headers:options.headers});
+  assert.equal(f.calls[0][0],'reserve');
+  return Response.json(response??{choices:[{finish_reason:'stop',message:{content:JSON.stringify(intake)}}],usage:{prompt_tokens:500,completion_tokens:60,total_tokens:560}},{status:code});
+ }});
+ return {...f,service,sends};
+}
+test('Baseten chat uses hackathon model, distinct secret, one request and the existing spending ledger',async()=>{
+ const f=basetenFixture();const r=await f.service.chat(f.request);
+ assert.equal(f.sends.length,1);assert.equal(f.sends[0].url,'https://inference.baseten.co/v1/chat/completions');
+ assert.equal(f.sends[0].headers.Authorization,'Bearer synthetic-baseten');assert.equal(f.sends[0].body.model,'meta-models/muse-spark-open-1026');
+ assert.equal(f.sends[0].body.max_tokens,1200);assert.equal(f.sends[0].body.tools,undefined);
+ assert.equal(f.calls[0][1].ceilingMicrousd,30100);assert.equal(f.calls[0][1].model,r.model);
+ assert.equal(r.provider,'Baseten');assert.equal(r.confirmed,false);assert.deepEqual(r.proposals,{item:'Stationery'});
+ assert.equal(f.settlements[0].estimatedMicrousd,880);assert.equal(f.jobs.at(-1).status,'succeeded');
+ assert.equal((await f.service.capabilities()).extractionAvailable,false);
+ await assert.rejects(()=>f.service.extract({}),e=>e.code==='AI_PAUSED');assert.equal(f.sends.length,1);
+});
+test('Baseten rejection retains allowance, pauses and never falls back to Meta',async()=>{
+ const f=basetenFixture({code:403,response:{error:'private-key-error'}});
+ await assert.rejects(()=>f.service.chat(f.request),e=>e.code==='PROVIDER_AUTH_REJECTED'&&!e.message.includes('private-key'));
+ assert.equal(f.sends.length,1);assert.equal(f.settlements[0].status,'billing_unknown');assert.equal(f.settingsChanges[0].patch.aiEnabled,false);
+});
+test('Baseten incomplete, unsafe JSON and tool outputs are charged but never accepted',async()=>{
+ for(const choice of [
+  {finish_reason:'length',message:{content:JSON.stringify(intake)}},
+  {finish_reason:'stop',message:{content:'{"eligible":true}'}},
+  {finish_reason:'stop',message:{content:JSON.stringify(intake),tool_calls:[{id:'not-allowed'}]}},
+  {finish_reason:'stop',message:{content:JSON.stringify(intake),refusal:'refused'}},
+ ]){
+  const f=basetenFixture({response:{choices:[choice],usage:{prompt_tokens:500,completion_tokens:60,total_tokens:560}}});
+  await assert.rejects(()=>f.service.chat(f.request),e=>['MODEL_INCOMPLETE','MODEL_OUTPUT_INVALID'].includes(e.code));
+  assert.equal(f.settlements[0].status,'succeeded');assert.equal(f.sends.length,1);
+ }
+});
+test('Baseten missing or excessive usage holds allowance and pauses',async()=>{
+ for(const usage of [undefined,{prompt_tokens:20001,completion_tokens:1},{prompt_tokens:500,completion_tokens:1201}]){
+  const f=basetenFixture({response:{choices:[{finish_reason:'stop',message:{content:JSON.stringify(intake)}}],usage}});
+  await assert.rejects(()=>f.service.chat(f.request),e=>e.code==='USAGE_UNVERIFIED');assert.equal(f.settlements[0].status,'billing_unknown');assert.equal(f.settingsChanges[0].patch.aiEnabled,false);
+ }
+});
+test('Baseten oversized UTF-8 conversation is rejected before reservation or traffic',async()=>{
+ const f=basetenFixture();
+ await assert.rejects(()=>f.service.chat({...f.request,history:Array.from({length:8},()=>({role:'user',content:'界'.repeat(1000)}))}),e=>e.code==='INPUT_TOO_LARGE');
+ assert.equal(f.sends.length,0);assert.equal(f.calls.length,0);
+});
+test('Baseten wrong model, missing key, unknown provider and mismatched price fail closed',async()=>{
+ for(const customEnv of [{BASETEN_MODEL:'meta-models/muse-spark-open'},{BASETEN_API_KEY:''},{AI_PROVIDER:'untrusted'}]){
+  const f=basetenFixture({customEnv});assert.equal((await f.service.capabilities()).chatAvailable,false);
+  await assert.rejects(()=>f.service.chat(f.request),e=>e.code==='MODEL_NOT_CONFIGURED');assert.equal(f.sends.length,0);
+ }
+ const f=fixture();const service=createAiService({env:{...env,AI_PROVIDER:'baseten',BASETEN_API_KEY:'test'},repository:f.repo,pricing:verifiedPricing,clock:()=>Date.parse('2026-11-03T12:00:00Z')});
+ assert.equal((await service.capabilities()).chatAvailable,false);
 });

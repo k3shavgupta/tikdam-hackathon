@@ -287,3 +287,20 @@ test("coverage distinguishes tested narrow routes from guidance and withholding 
   assert.equal(france.sourceChecked,null);
   assert.deepEqual(france.sources,[]);
 });
+
+test('every selectable location respects the published limits for all three workflows', () => {
+  const coverage = catalogue.getCoverage();
+  assert.equal(coverage.length, 250);
+  for (const row of coverage) {
+    const local = {...facts, country:row.code, businessCountry:row.code, currency:row.currency || ''};
+    const plan = planPurchase({...local,mode:'before'});
+    const bill = assess({...local,mode:'purchase'});
+    const payment = assess({...local,mode:'client'});
+    assert.equal(plan.guaranteedRefund,false,row.code);
+    assert.equal(payment.benefit.amount,null,row.code);
+    if (row.purchaseEstimate !== 'conditional_narrow') assert.equal(bill.benefit.amount,null,row.code);
+    if (row.readiness === 'unreviewed') {
+      for (const outcome of [plan,bill,payment]) assert.deepEqual(outcome.sources,[],row.code);
+    }
+  }
+});

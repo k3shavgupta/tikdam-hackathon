@@ -69,6 +69,8 @@ async function setup() {
       .filter(Boolean)
       .map((x) => db.prepare(x)),
   );
+  const topicMigration = await readFile(new URL("../migrations/0003_chat_topics.sql", import.meta.url), "utf8");
+  await db.batch(topicMigration.split(";").map(x => x.trim()).filter(Boolean).map(x => db.prepare(x)));
   const repository = createRepository(db, { clock });
   await repository.updateSettings({
     actor: "test-owner",

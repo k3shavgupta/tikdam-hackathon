@@ -1,8 +1,11 @@
 import {z} from 'zod';
+import {providerInfo} from '../server/ai/provider.mjs';
 import {countries,indiaCheckDefinitions,clientSources} from '../server/catalog.mjs';
 import {factsSchema} from '../server/schema.mjs';
 import {planPurchase,assess} from '../server/domain.mjs';
 import {requireAdmin} from './auth.mjs';
+import {requireCustomer} from './customer-auth.mjs';
+import {clerkConfig} from '../server/clerk-config.mjs';
 import {verifyChallenge} from './turnstile.mjs';
 import {createEvaluationReporting} from '../server/evaluation/reporting.mjs';
 import {json,safeError,securityHeaders,checkOrigin,readJson,normalizedPath,cookieValue,keyedDigest} from './http.mjs';
@@ -55,17 +58,26 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
           return securityHeaders(response||json({code:'NOT_FOUND',message:'Unknown admin API route.',requestId},404));
         }
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Use GET to open the dashboard.');
-        const asset=await env.ASSETS.fetch(new Request(new URL('/app.html',request.url),{method:request.method,headers:request.headers}));
+        const asset=await env.ASSETS.fetch(new Request(new URL('/app/index.html',request.url),{method:request.method,headers:request.headers}));
         const headers=new Headers(asset.headers);headers.set('Cache-Control','no-store');
         return securityHeaders(new Response(asset.body,{status:asset.status,headers}));
       }
       if(!isApi){
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Method not allowed.');
         if(!env.ASSETS)throw safeError('ASSETS_UNAVAILABLE',503,'Application assets are not configured.');
-        const appPath=lower==='/app'||lower.startsWith('/app/');
-        const assetPath=appPath?'/app.html':path==='/'?'/index.html':path;
-        const asset=await env.ASSETS.fetch(new Request(new URL(assetPath,request.url),request));
-        return securityHeaders(asset,{landing:!appPath&&assetPath!=='/app.html'});
+        if(lower==='/app'||lower.startsWith('/app/')){
+          const asset=await env.ASSETS.fetch(new Request(new URL('/app/index.html',request.url),{method:request.method,headers:request.headers}));
+          return securityHeaders(new Response(asset.body,{status:asset.status,headers:asset.headers}),{clerkOrigin:clerkConfig(env).frontendOrigin});
+        }
+        return securityHeaders(await env.ASSETS.fetch(request));
+      }
+      if(path==='/api/auth/config'&&request.method==='GET'){
+        const {enabled,publishableKey}=clerkConfig(env);
+        return securityHeaders(json({enabled,publishableKey}));
+      }
+      if(path==='/api/account'&&request.method==='GET'){
+        const customer=await requireCustomer(request,env);
+        return securityHeaders(json(customer));
       }
       if(path==='/api/config'&&request.method==='GET'){
         let ai={...disabled};
@@ -78,7 +90,7 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
         }catch{}
         if(!env.TURNSTILE_SITE_KEY||!env.TURNSTILE_SECRET_KEY||String(env.SESSION_HMAC_SECRET||'').length<32)ai={...disabled,reason:'AI controls are not configured. Manual entry remains available.'};
         const coverageRows=await coverage();
-        return securityHeaders(json({countries:countries.map(c=>({code:c.code,name:c.name,currency:c.currency,tax:c.tax,idLabel:c.idLabel,sources:c.sources,coverage:coverageRows.find(row=>row.code===c.code)?.purchaseEstimate==='conditional_narrow'?'Guidance + limited conditional estimates':c.sources.length?'Guidance; estimates need review':'General evidence preparation; local rules not reviewed'})),coverage:coverageRows,indiaCheckDefinitions,clientSources:Object.values(clientSources),modelConfigured:Boolean(ai.extractionAvailable),model:env.META_MODEL||'muse-spark-1.3',provider:'Meta Model API',ai,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,limits:{fileMB:6,pdfPages:10},storage:'Invoices and profile facts are transient. Minimal operational metadata is eligible for bounded daily cleanup after 30 days, explicit feedback after 90 days; processing a backlog can take longer, and a minimal campaign spending ledger is retained to enforce the cap. Meta processing follows its service terms.'}));
+        return securityHeaders(json({countries:countries.map(c=>({code:c.code,name:c.name,currency:c.currency,tax:c.tax,idLabel:c.idLabel,sources:c.sources,coverage:coverageRows.find(row=>row.code===c.code)?.purchaseEstimate==='conditional_narrow'?'Guidance + limited conditional estimates':c.sources.length?'Guidance; estimates need review':'General evidence preparation; local rules not reviewed'})),coverage:coverageRows,indiaCheckDefinitions,clientSources:Object.values(clientSources),modelConfigured:Boolean(ai.extractionAvailable),model:providerInfo(env).model,provider:providerInfo(env).provider,ai,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,limits:{fileMB:6,pdfPages:10},storage:'Invoices and profile facts are transient. Minimal operational metadata is eligible for bounded daily cleanup after 30 days, explicit feedback after 90 days; processing a backlog can take longer, and a minimal campaign spending ledger is retained to enforce the cap. The selected AI provider processes conversations under its service terms.'}));
       }
       if(['/api/plan','/api/assess'].includes(path)&&request.method==='POST'){
         const facts=factsSchema.parse(await readJson(request));
@@ -95,6 +107,11 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
       }
       if(path==='/api/session/clear'&&request.method==='POST'){
         z.object({}).strict().parse(await readJson(request,1024));
+        const sessionId=uuid.safeParse(cookieValue(request,'tikdam_session'));
+        if(sessionId.success){
+          const repository=await repositoryFactory(env.DB);
+          await repository.revokeSession(sessionId.data);
+        }
         const secure=new URL(request.url).protocol==='https:'?'; Secure':'';
         return securityHeaders(json({ok:true},200,{'Set-Cookie':`tikdam_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`}));
       }
@@ -123,6 +140,14 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
         const settings=await repository.getSettings();
         if(env.AI_ENABLED!=='true'||!settings.aiEnabled)throw safeError('AI_PAUSED',503,disabled.reason);
         const operation=path.slice(5);
+        // A tab loaded before a provider switch must renew consent first.
+        if(operation==='chat'){
+          const consentProvider=request.headers.get('X-AI-Provider');
+          const selected=providerInfo(env).id;
+          if((selected==='baseten' && consentProvider!==selected)||(consentProvider && consentProvider!==selected))
+            throw safeError('PROVIDER_CHANGED',409,'The AI provider has changed. Refresh the page and review the processing consent before sending.');
+        }
+        if(operation==='extract'&&env.AI_EXTRACTION_ENABLED!=='true')throw safeError('AI_PAUSED',503,'Invoice extraction is paused. Enter the invoice details manually.');
         const body=(operation==='extract'?extractionSchema:chatSchema).parse(await readJson(request,operation==='extract'?9000000:32768));
         const idempotencyKey=uuid.parse(request.headers.get('Idempotency-Key'));
         const clientKey=await throttleKey(request,env,operation);

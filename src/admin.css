@@ -7,3 +7,17 @@
 @media(max-width:850px){.tk-metrics{grid-template-columns:1fr 1fr;gap:24px}.tk-metrics>div:nth-child(2){border-right:0}.tk-admin-intro{align-items:start;flex-direction:column;gap:16px}.tk-breakdowns{grid-template-columns:1fr}.tk-route summary{flex-wrap:wrap;gap:8px}.tk-route summary span{width:100%;margin-left:20px}.tk-activity-counts{gap:28px;flex-wrap:wrap}}
 @media(max-width:520px){.tk-admin-main{padding:28px 16px 48px}.tk-admin-header{padding:14px 16px;gap:12px}.tk-admin-header>span{font-size:.75rem;padding-left:12px}.tk-admin-header>a:last-child{font-size:.8rem}.tk-budget,.tk-admin-section{padding:20px 16px}.tk-section-heading{flex-direction:column;gap:14px}.tk-metrics{gap:20px 12px}.tk-metrics dt{font-size:.75rem}.tk-metrics dd{font-size:1.5rem}.tk-metrics>div{padding-right:6px}.tk-pagination{justify-content:space-between;gap:8px;flex-wrap:wrap}.tk-pagination button{font-size:.78rem;padding:8px}.tk-route-facts{grid-template-columns:1fr}.tk-actions button{width:100%}.tk-turn-user{margin-left:12px}.tk-activity-counts{gap:18px}.tk-activity-counts dt{font-size:.75rem}.tk-filters label{flex-basis:100%}.tk-admin-footer{padding:20px 16px}}
 @media(prefers-reduced-motion:reduce){.tk-admin *,.tk-assistant *,.tk-feedback *{scroll-behavior:auto;transition:none;animation:none}}
+
+/* Use the receipt identity in the private dashboard and public assistant. */
+.tk-admin,.tk-assistant,.tk-feedback{--tk-ink:#121212;--tk-muted:#4b4b45;--tk-blue:#267a42;--tk-pale:#e7f7de;--tk-line:#d4d0bd}
+.tk-admin{background:#fffbeb}
+.tk-admin-header{background:#fffbeb;border-bottom:2px solid #121212}
+.tk-admin-brand img{display:block;width:160px;height:auto}
+.tk-admin h1,.tk-admin h2,.tk-admin h3,.tk-assistant h2{font-family:"Bricolage Grotesque",Arial,sans-serif}
+.tk-budget,.tk-admin-section{border:2px solid #121212;background:#fffdf8;box-shadow:4px 4px 0 #121212}
+.tk-admin .tk-primary,.tk-assistant .tk-primary,.tk-feedback .tk-primary{background:#121212;border-color:#121212;color:#fff}
+.tk-admin .tk-secondary,.tk-assistant .tk-secondary,.tk-feedback .tk-secondary{border:2px solid #121212;background:#fffdf8;color:#121212}
+.tk-admin .tk-secondary:hover,.tk-assistant .tk-secondary:hover,.tk-feedback .tk-secondary:hover{background:#b6f09c}
+.tk-admin th,.tk-assistant .tk-turn{background:#e7f7de}
+.tk-assistant .tk-turn-user{background:#f1efe5}
+.tk-admin :focus-visible,.tk-assistant :focus-visible,.tk-feedback :focus-visible{outline-color:#267a42}

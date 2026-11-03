@@ -1,14 +1,12 @@
-export const dynamic = "force-static";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { ImageResponse } from "next/og";
+
+export const dynamic = "force-static";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Tikdam. Check before you buy.";
 
-export default async function OpenGraphImage() {
-  const logo = await readFile(path.join(process.cwd(), "public/brand/logo.png"));
+export default function OpenGraphImage() {
   return new ImageResponse(
     (
       <div
@@ -35,8 +33,22 @@ export default async function OpenGraphImage() {
             letterSpacing: -2,
           }}
         >
-          {/* Satori renders the outlined wordmark into the social card. */}
-          <img src={`data:image/png;base64,${logo.toString("base64")}`} width={220} height={51} alt="Tikdam" />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 60,
+              height: 60,
+              borderRadius: 12,
+              background: "#B6F09C",
+              border: "4px solid #121212",
+              fontSize: 45,
+            }}
+          >
+            T
+          </div>
+          <span>tikdam.</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <span style={{ fontSize: 25, fontWeight: 700 }}>

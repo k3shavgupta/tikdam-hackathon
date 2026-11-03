@@ -74,6 +74,14 @@ test('dashboard shows real empty states and pause action cannot reset spending',
  }finally{await view.cleanup();}
 });
 
+test('owner dashboard shows fixed chat topics and per-query micro-dollar estimates',async()=>{
+ const overview={settings:{aiEnabled:true,campaignCapMicrousd:5000000,dailyCapMicrousd:1000000,dailyCallCap:10,maxInFlight:1},usage:{spentMicrousd:3038,reservedMicrousd:30100,remainingMicrousd:4966862,inputTokens:829,outputTokens:471,billingUnknown:1},totals:{started:0,completed:0,failed:1},byCountry:[],byMode:[],byChatTopic:[{topic:'seller_verification',queries:1,estimatedMicrousd:3038,heldMicrousd:0}]};
+ const jobs={items:[{id:'test-request',operation:'chat',mode:'before',country:'IN',topic:'seller_verification',status:'succeeded',model:'test-model',createdAt:'2026-11-03T13:13:15.000Z',inputTokens:829,outputTokens:471,estimatedMicrousd:3038,heldMicrousd:null}],total:1};
+ const view=await mount(components.AdminApp,{},async path=>path.includes('/overview')?Response.json(overview):path.includes('/jobs')?Response.json(jobs):Response.json({items:[],total:0}));
+ try{const content=view.dom.window.document.body.textContent;assert.match(content,/seller verification/);assert.match(content,/\$0\.003038/);assert.match(content,/No question text is saved/);}
+ finally{await view.cleanup();}
+});
+
 const emptyOverview={settings:{aiEnabled:false,campaignCapMicrousd:5000000,dailyCapMicrousd:1000000,dailyCallCap:10,maxInFlight:1},usage:{spentMicrousd:0,reservedMicrousd:0,remainingMicrousd:5000000,inputTokens:0,outputTokens:0,billingUnknown:0},totals:{started:0,completed:0,failed:0},byCountry:[],byMode:[]};
 async function change(view,element,value){
  await act(async()=>{
@@ -124,7 +132,7 @@ test('job filters use validated query fields and submitted feedback is rendered 
 
 test('denied admin request offers owner login and never shows invented metrics',async()=>{
  const view=await mount(components.AdminApp,{},async()=>Response.json({code:'ADMIN_ACCESS_DENIED',message:'Administrator access requires owner login.'},{status:403}));
- try{const d=view.dom.window.document;assert.match(d.body.textContent,/owner login/);assert.equal(d.querySelector('.tk-metrics'),null);assert.equal(d.querySelector('a[href="/admin"]').textContent,'Open owner login');}
+ try{const d=view.dom.window.document;assert.match(d.body.textContent,/owner login/);assert.equal(d.querySelector('.tk-metrics'),null);assert.equal(d.querySelector('a[href="/admin"]').textContent,'Open owner login');assert.equal(d.querySelector('a[href="/app"]').textContent,'Open checker');}
  finally{await view.cleanup();}
 });
 
@@ -156,12 +164,15 @@ test('assistant sends only after consent and challenge, and proposals require an
   const chat=requests.filter(row=>row.path==='/api/chat');assert.equal(chat.length,1);
   assert.deepEqual(JSON.parse(chat[0].options.body),{purpose:'intake',facts,history:[{role:'user',content:'I want office supplies.'}]});
   assert.equal(applied.length,0);assert.match(d.body.textContent,/Details still needed: registration/);
+  assert.equal(d.querySelector('.tk-challenge'),null);
+  await change(view,d.querySelector('textarea'),'A follow-up question.');
+  assert.ok(d.querySelector('.tk-challenge'));
   assert.equal(d.querySelector('a').getAttribute('href'),'https://example.test/official');assert.equal(d.querySelector('a[href*="evil.test"]'),null);
   assert.equal(d.querySelector('a[href="https://example.test/withholding"]')?.textContent,'Official withholding source');
   await act(async()=>{[...d.querySelectorAll('button')].find(button=>button.textContent==='Apply suggested fields').click();});
   assert.deepEqual(applied,[{item:'Office stationery'}]);
   await act(async()=>{view.root.render(React.createElement(components.AssistantPanel,{facts:{...facts,country:'GB'},config:{ai:{chatAvailable:true},turnstileSiteKey:'synthetic-site-key',countries:[{code:'GB',sources:[{id:'gb-1'}]}]},onPropose:proposal=>applied.push(proposal)}));});
-  assert.equal(d.querySelectorAll('.tk-turn').length,0);
+  assert.equal(d.querySelectorAll('.tk-turn:not(.tk-opening)').length,0);
   assert.equal(d.querySelector('input[type="checkbox"]').checked,false);
   assert.equal(requests.filter(row=>row.path==='/api/chat').length,1);
  }finally{await view.cleanup();}
@@ -199,4 +210,66 @@ test('dashboard does not invent evaluation traffic before a snapshot is imported
  const view=await mount(components.AdminApp,{},async(path)=>Response.json(path.includes('/overview')?emptyOverview:path.includes('/evaluation')?{snapshot:null}:{items:[],total:0}));
  try{assert.match(view.dom.window.document.body.textContent,/No evaluation snapshot has been imported/);assert.equal(view.dom.window.document.querySelector('[data-evaluation-provider]'),null);}
  finally{await view.cleanup();}
+});
+
+test('Baseten processing consent identifies the actual selected provider',()=>{
+ const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'IN'},config:{provider:'Baseten',ai:{chatAvailable:true},countries:[{code:'IN',sources:[]}]}}));
+ assert.match(html,/Muse Spark Open · Baseten/);assert.match(html,/details to Baseten for processing/);assert.doesNotMatch(html,/details to Meta for processing/);
+});
+
+test('conversation starter fills a draft without sending or granting consent',async()=>{
+ const requests=[];
+ const view=await mount(components.AssistantPanel,{conversational:true,facts:{mode:'client',country:'IN'},config:{provider:'Baseten',ai:{chatAvailable:true},countries:[{code:'IN',sources:[]}]}},async(path)=>{requests.push(path);return Response.json({ok:true});});
+ try{
+  const d=view.dom.window.document;
+  assert.match(d.querySelector('[role="log"]').textContent,/What work did you do/);
+  await act(async()=>d.querySelector('.chat-starters button').click());
+  assert.equal(d.querySelector('textarea').value,'My client paid less than the invoice.');
+  assert.equal(d.querySelector('.tk-check input').checked,false);
+  assert.equal([...d.querySelectorAll('button')].find(x=>x.textContent==='Send question').disabled,true);
+  assert.equal(requests.length,0);
+ }finally{await view.cleanup();}
+});
+
+test('six exchanges stay readable while each provider request has a bounded context',async()=>{
+ const requests=[];
+ const config={ai:{chatAvailable:true},turnstileSiteKey:'fixture',countries:[]};
+ const view=await mount(components.AssistantPanel,{facts:{mode:'before',country:'GB'},config},async(path,options)=>{
+  if(path==='/api/chat')requests.push(JSON.parse(options.body));
+  return Response.json({message:'Fictional reply',proposals:{}});
+ },win=>{win.turnstile={render(el,opts){opts.callback('synthetic');return 'widget';},remove(){}};});
+ try {
+  const d=view.dom.window.document;
+  await act(async()=>d.querySelector('.tk-check input').click());
+  for(let i=1;i<=6;i++){
+   await change(view,d.querySelector('textarea'),'Question '+i);
+   await act(async()=>d.querySelector('.tk-actions button').click());
+  }
+  assert.equal(requests.length,6);
+  assert.equal(requests.at(-1).history.length,7);
+  assert.equal(requests.at(-1).history[0].content,'Question 3');
+  assert.equal(d.querySelectorAll('.tk-turn').length,12);
+  assert.match(d.querySelector('[role="log"]').textContent,/Question 1/);
+ }finally{await view.cleanup();}
+});
+
+test('verification retry preserves the draft and ignores expired callbacks from a removed widget',async()=>{
+ const widgets=[], requests=[];
+ const view=await mount(components.AssistantPanel,{facts:{mode:'purchase',country:'IN'},config:{ai:{chatAvailable:true},turnstileSiteKey:'fixture',countries:[]}},async(path)=>{
+  requests.push(path);return Response.json({});
+ },win=>{win.turnstile={render(el,options){widgets.push(options);return widgets.length;},remove(){}};});
+ try{
+  const d=view.dom.window.document;
+  await change(view,d.querySelector('textarea'),'My fictional purchase');
+  await act(async()=>d.querySelector('.tk-check input').click());
+  await act(async()=>widgets.at(-1)['error-callback']());
+  assert.ok(d.querySelector('.tk-actions button').disabled);
+  const old=widgets.at(-1);
+  await act(async()=>d.querySelector('.tk-challenge button').click());
+  await act(async()=>widgets.at(-1).callback('fresh'));
+  await act(async()=>old['expired-callback']());
+  assert.equal(d.querySelector('.tk-actions button').disabled,false);
+  assert.equal(d.querySelector('textarea').value,'My fictional purchase');
+  assert.equal(requests.length,0);
+ }finally{await view.cleanup();}
 });

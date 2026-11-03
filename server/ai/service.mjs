@@ -7,12 +7,15 @@ import {
 import { chatRequest, createChatPayload, parseChatResult } from "./schemas.mjs";
 import {
   verifiedPricing,
+  verifiedBasetenPricing,
   validatePricing,
   estimateMicrousd,
   validatedUsage,
   aiError,
 } from "./pricing.mjs";
 import { payloadDigest, reserve } from "./budget.mjs";
+import { providerInfo, BASETEN_MODEL } from './provider.mjs';
+import { classifyChatTopic } from './topics.mjs';
 
 const identity = z
   .object({
@@ -22,18 +25,22 @@ const identity = z
   })
   .strip();
 const integer = z.number().int().safe().nonnegative();
-const endpoint = "https://api.meta.ai/v1/responses";
 
 export function createAiService({
   env = {},
   repository,
   fetchImpl = fetch,
   clock = () => Date.now(),
-  pricing = verifiedPricing,
+  pricing,
 } = {}) {
-  const model = env.META_MODEL || "muse-spark-1.3";
-  const key = env.META_MODEL_API_KEY || env.MODEL_API_KEY || "";
+  const {id: providerId, provider, model} = providerInfo(env);
+  const baseten = providerId === 'baseten';
+  const endpoint = baseten ? 'https://inference.baseten.co/v1/chat/completions' : 'https://api.meta.ai/v1/responses';
+  const key = baseten ? env.BASETEN_API_KEY || '' : env.META_MODEL_API_KEY || env.MODEL_API_KEY || "";
+  pricing ??= baseten ? verifiedBasetenPricing : verifiedPricing;
   function configuration() {
+    if ((env.AI_PROVIDER && !['meta','baseten'].includes(env.AI_PROVIDER)) || (baseten && model !== BASETEN_MODEL))
+      throw aiError('MODEL_NOT_CONFIGURED', 'The selected AI provider or model is not supported.');
     if (env.AI_ENABLED !== "true")
       throw aiError(
         "AI_PAUSED",
@@ -42,7 +49,7 @@ export function createAiService({
     if (!key)
       throw aiError(
         "MODEL_NOT_CONFIGURED",
-        "Meta is not configured. Manual entry remains available.",
+        `${provider} is not configured. Manual entry remains available.`,
       );
     if (
       typeof env.SESSION_HMAC_SECRET !== "string" ||
@@ -67,7 +74,7 @@ export function createAiService({
       return {
         enabled: true,
         chatAvailable: true,
-        extractionAvailable: true,
+        extractionAvailable: !baseten && env.AI_EXTRACTION_ENABLED === "true",
         reason: null,
       };
     } catch (error) {
@@ -96,6 +103,8 @@ export function createAiService({
     try {
       response = await fetchImpl(url, {
         method: "POST",
+        // workerd supports manual or follow. Reject 3xx via response.ok below.
+        redirect: 'manual',
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
@@ -106,18 +115,18 @@ export function createAiService({
     } catch {
       throw aiError(
         "PROVIDER_UNAVAILABLE",
-        "Meta did not respond. This request was not automatically retried.",
+        `${provider} did not respond. This request was not automatically retried.`,
         502,
       );
     }
     if (!response.ok)
       throw aiError(
-        response.status === 401
+        [401,403].includes(response.status)
           ? "PROVIDER_AUTH_REJECTED"
           : response.status === 429
             ? "PROVIDER_LIMIT"
             : "PROVIDER_UNAVAILABLE",
-        "Meta could not complete this operation. Use manual entry; the request was not automatically retried.",
+        `${provider} could not complete this operation. Use manual entry; the request was not automatically retried.`,
         502,
       );
     // Bound upstream data while reading; never put its raw body in an error/log.
@@ -150,12 +159,12 @@ export function createAiService({
     } catch {
       throw aiError(
         "PROVIDER_RESPONSE_INVALID",
-        "Meta returned an unreadable response. Use manual entry.",
+        `${provider} returned an unreadable response. Use manual entry.`,
         502,
       );
     }
   }
-  async function perform({ operation, input, payload, parse, mode, country }) {
+  async function perform({ operation, input, payload, parse, mode, country, topic }) {
     const verified = configuration();
     identity.parse(input);
     let settings;
@@ -172,13 +181,25 @@ export function createAiService({
         "AI_PAUSED",
         "AI is paused. Manual entry remains available.",
       );
-    const body = {
+    const body = baseten ? {
+      model,
+      max_tokens: verified.maxOutputTokens,
+      reasoning_effort: 'low',
+      messages: [
+        {role: 'system', content: payload.instructions + ' Return only JSON matching the supplied schema. No markdown fences.'},
+        {role: 'user', content: JSON.stringify({input: payload.input, jsonSchema: payload.text.format.schema})},
+      ],
+    } : {
       ...payload,
       model,
       store: false,
       reasoning: {effort: "minimal"},
       max_output_tokens: verified.maxOutputTokens,
     };
+    // No media or arbitrary tools are accepted by the Baseten chat adapter.
+    // The byte ceiling includes the entire rendered request and framing slack.
+    if (baseten && new TextEncoder().encode(JSON.stringify(body)).length + 4096 > verified.maxInputTokens)
+      throw aiError('INPUT_TOO_LARGE', 'This conversation exceeds the small-budget input limit. Use a shorter conversation.', 413);
     const ceilingMicrousd = estimateMicrousd(
       {
         inputTokens: verified.maxInputTokens,
@@ -191,6 +212,7 @@ export function createAiService({
       sessionId: input.sessionId,
       idempotencyKey: input.idempotencyKey,
       payloadHmac: await payloadDigest(env.SESSION_HMAC_SECRET, {
+        provider: providerId,
         operation,
         body,
       }),
@@ -212,11 +234,12 @@ export function createAiService({
         operation,
         model,
         status: "running",
+        ...(topic ? { topic } : {}),
         ...(mode ? { mode } : {}),
         ...(country ? { country } : {}),
       });
       recorded = true;
-      const preflight = await requestJson(
+      const preflight = baseten ? {input_tokens: verified.maxInputTokens} : await requestJson(
         endpoint + "/input_tokens",
         {
           model,
@@ -247,7 +270,15 @@ export function createAiService({
           "AI was paused before generation. No generation was requested.",
         );
       generated = true;
-      const result = await requestJson(endpoint, body);
+      const upstream = await requestJson(endpoint, body);
+      const choice = baseten ? upstream.choices?.[0] : null;
+      const result = baseten ? {
+        status: choice?.finish_reason === 'stop' ? 'completed' : 'incomplete',
+        usage: {input_tokens: upstream.usage?.prompt_tokens, output_tokens: upstream.usage?.completion_tokens, total_tokens: upstream.usage?.total_tokens},
+        output: upstream.choices?.length === 1 && !choice?.message?.tool_calls?.length && !choice?.message?.function_call && !choice?.message?.refusal
+          ? [{type: 'message', content: [{type: 'output_text', text: typeof choice?.message?.content === 'string' ? choice.message.content : ''}]}]
+          : [{type: 'unsupported'}],
+      } : upstream;
       usage = validatedUsage(result.usage, verified, measured.data);
       estimatedMicrousd = estimateMicrousd(usage, verified);
       await repository.settleAiCall({
@@ -340,6 +371,11 @@ export function createAiService({
     capabilities,
     async extract(input) {
       configuration();
+      if (baseten || env.AI_EXTRACTION_ENABLED !== "true")
+        throw aiError(
+          "AI_PAUSED",
+          "Invoice extraction is paused. Enter the invoice details manually.",
+        );
       identity.parse(input);
       if (input.consent !== true)
         throw aiError(
@@ -389,9 +425,10 @@ export function createAiService({
         payload: pack.body,
         mode: value.facts.mode,
         country: value.facts.country,
+        topic: classifyChatTopic(value),
         parse: (text) => ({
           ...parseChatResult(text, { purpose: value.purpose, ...pack }),
-          provider: "Meta Model API",
+          provider,
           model,
           confirmed: false,
         }),

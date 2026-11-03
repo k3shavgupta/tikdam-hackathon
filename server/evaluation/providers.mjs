@@ -54,8 +54,8 @@ export async function readBasetenModels({ledger,key,fetchImpl=fetch,requestId=ra
  try{const r=await send({ledger,reservationId,kind:'metadata',url:BASETEN+'/models',key,method:'GET',fetchImpl});await ledger.settle({reservationId,status:'unbilled'});return{models:(r.data||[]).map(x=>x.id).filter(x=>typeof x==='string')};}
  catch(error){await ledger.settle({reservationId,status:'unbilled',errorCode:safeCode(error)});return{models:[],errorCode:safeCode(error)};}
 }
-export async function evaluateBaseten({ledger,fixture,key,model='meta-models/muse-spark-open',fetchImpl=fetch,diagnosticSink=()=>{},requestId=randomUUID()}){
- if(!key)throw err('MODEL_NOT_CONFIGURED');if(model!=='meta-models/muse-spark-open'||fixture.operation!=='chat')throw err('UNSUPPORTED_COMPARISON');
+export async function evaluateBaseten({ledger,fixture,key,model='meta-models/muse-spark-open-1026',fetchImpl=fetch,diagnosticSink=()=>{},requestId=randomUUID()}){
+ if(!key)throw err('MODEL_NOT_CONFIGURED');if(!['meta-models/muse-spark-open','meta-models/muse-spark-open-1026'].includes(model)||fixture.operation!=='chat')throw err('UNSUPPORTED_COMPARISON');
  const pricing=validatePricing(verifiedPricing,'muse-spark-1.3');const p=await pack(fixture);
  const content=JSON.stringify({input:p.body.input,jsonSchema:p.body.text.format.schema});
  // Text-only byte bound, generous scaffolding allowance; no implicit media.

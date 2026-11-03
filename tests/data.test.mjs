@@ -45,6 +45,8 @@ async function setup() {
         .map((x) => db.prepare(x)),
     );
   await migrate();
+  const topicMigration = await readFile(new URL("../migrations/0003_chat_topics.sql", import.meta.url), "utf8");
+  await db.batch(topicMigration.split(";").map(x => x.trim()).filter(Boolean).map(x => db.prepare(x)));
   let now = Date.parse("2026-11-01T10:00:00Z");
   const repository = createRepository(db, { clock: () => now });
   return { db, repository, migrate, advance: (ms) => (now += ms) };
@@ -329,6 +331,36 @@ test("job lists filter safely, enforce pagination and never expose invoice data"
   await assert.rejects(() => r.listJobs({ country: "GB' OR 1=1" }));
 });
 
+test("chat topic and exact query cost are owner metadata without stored question text", async () => {
+  const { repository: r, db } = await setup();
+  await r.updateSettings({ actor, patch: { aiEnabled: true } });
+  const request = call({ ceilingMicrousd: 30100 });
+  const admitted = await r.reserveAiCall(request);
+  assert.equal(admitted.admitted, true);
+  await r.recordJob({ id: request.requestId, operation: 'chat', status: 'running', mode: 'before', country: 'IN', topic: 'seller_verification' });
+  await r.settleAiCall({ reservationId: admitted.reservationId, status: 'succeeded', tokens: { inputTokens: 829, outputTokens: 471 }, estimatedMicrousd: 3038 });
+  await r.finishJob({ id: request.requestId, status: 'succeeded', tokens: { inputTokens: 829, outputTokens: 471 }, estimatedMicrousd: 3038 });
+  const overview = await r.getOverview();
+  assert.deepEqual(overview.byChatTopic, [{ topic: 'seller_verification', queries: 1, estimatedMicrousd: 3038, heldMicrousd: 0 }]);
+  const job = (await r.listJobs({ operation: 'chat' })).items[0];
+  assert.equal(job.topic, 'seller_verification');
+  assert.equal(job.estimatedMicrousd, 3038);
+  assert.equal(job.heldMicrousd, null);
+  assert.equal(JSON.stringify((await db.prepare('SELECT * FROM jobs').all()).results).includes('seller GSTIN 22ABCDE1234F1Z5'), false);
+  await assert.rejects(() => r.recordJob({ id: crypto.randomUUID(), operation: 'chat', status: 'running', topic: 'seller GSTIN 22ABCDE1234F1Z5' }));
+});
+
+test("topic totals include billed model output even when a chat reply fails validation", async () => {
+  const {repository:r}=await setup();
+  await r.updateSettings({actor,patch:{aiEnabled:true}});
+  const request=call({ceilingMicrousd:30100});
+  const admitted=await r.reserveAiCall(request);
+  await r.recordJob({id:request.requestId,operation:'chat',status:'running',topic:'purchase_planning'});
+  await r.settleAiCall({reservationId:admitted.reservationId,status:'succeeded',tokens:{inputTokens:100,outputTokens:20},estimatedMicrousd:500});
+  await r.finishJob({id:request.requestId,status:'failed',errorCode:'MODEL_OUTPUT_INVALID',tokens:{inputTokens:100,outputTokens:20},estimatedMicrousd:500});
+  assert.deepEqual((await r.getOverview()).byChatTopic,[{topic:'purchase_planning',queries:1,estimatedMicrousd:500,heldMicrousd:0}]);
+});
+
 test("overview pricing versions come from the all-time ledger and jobs expose only their recorded version", async () => {
   const { repository: r } = await setup();
   await r.updateSettings({ actor, patch: { aiEnabled: true } });
@@ -430,4 +462,67 @@ test("retention deletes expired metadata and feedback but preserves cost and aud
   assert.ok(
     (await db.prepare("SELECT COUNT(*) n FROM admin_audit").first()).n > 0,
   );
+});
+
+test('Baseten chat records exact model and usage in real D1 and refuses duplicate paid work',async()=>{
+ const {createAiService}=await import('../server/ai/service.mjs');
+ const {db,repository:r,advance}=await setup();
+ advance(2*86400000+2*3600000);
+ await r.updateSettings({actor,patch:{aiEnabled:true}});
+ let sends=0;
+ const service=createAiService({env:{AI_ENABLED:'true',AI_PROVIDER:'baseten',BASETEN_API_KEY:'synthetic-only',SESSION_HMAC_SECRET:'synthetic-long-hmac-key-at-least-32',TURNSTILE_SITE_KEY:'synthetic-site',TURNSTILE_SECRET_KEY:'synthetic-secret'},repository:r,clock:()=>Date.parse('2026-11-03T12:00:00Z'),fetchImpl:async()=>{
+  sends++;return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({question:'What are you buying?',proposals:[],missingFields:['item'],sourceIds:[]})}}],usage:{prompt_tokens:500,completion_tokens:60,total_tokens:560}});
+ }});
+ const input={requestId:crypto.randomUUID(),sessionId:crypto.randomUUID(),idempotencyKey:crypto.randomUUID(),purpose:'intake',facts:{mode:'before',country:'IN',businessCountry:'IN'},history:[{role:'user',content:'Fictional stationery purchase'}]};
+ const answer=await service.chat(input);assert.equal(answer.provider,'Baseten');
+ const row=await db.prepare('SELECT model,status,estimated_microusd FROM ai_reservations WHERE id=?').bind(input.requestId).first();
+ assert.deepEqual(row,{model:'meta-models/muse-spark-open-1026',status:'succeeded',estimated_microusd:880});
+ await assert.rejects(()=>service.chat({...input,requestId:crypto.randomUUID()}),e=>e.code==='ALREADY_PROCESSED');assert.equal(sends,1);
+});
+
+test('Worker verifies the challenge, bills one chat in D1, rejects a replay and revokes the cleared cookie', async () => {
+  const {createHandler} = await import('../worker/index.mjs');
+  const {createAiService} = await import('../server/ai/service.mjs');
+  const {db, repository, advance} = await setup();
+  advance(50 * 3600000);
+  const now = Date.parse('2026-11-03T12:00:00Z');
+  const origin = 'https://tikdam.xyz';
+  const env = {APP_ORIGINS:origin, AI_ENABLED:'true', AI_PROVIDER:'baseten', BASETEN_API_KEY:'fixture',
+    SESSION_HMAC_SECRET:'synthetic-hmac-key-for-integration-only', TURNSTILE_SITE_KEY:'test-site', TURNSTILE_SECRET_KEY:'fixture'};
+  await repository.updateSettings({actor,patch:{aiEnabled:true}});
+  const sessionId = crypto.randomUUID();
+  await repository.createSession({id:sessionId,expiresAt:new Date(now+3600000).toISOString()});
+  let generations = 0;
+  const app = createHandler({
+    repositoryFactory:()=>repository,
+    aiFactory:args=>createAiService({...args,clock:()=>now}),
+    fetchImpl:async (url, options) => {
+      if(String(url).includes('/siteverify')){
+        const {response} = JSON.parse(options.body);
+        return Response.json({success:response==='fixture-valid',hostname:'tikdam.xyz',action:'chat'});
+      }
+      assert.equal(new URL(url).origin,'https://inference.baseten.co');
+      generations++;
+      return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify({
+        question:'What are you buying?',proposals:[],missingFields:['item'],sourceIds:[]
+      })}}],usage:{prompt_tokens:500,completion_tokens:60,total_tokens:560}});
+    }
+  });
+  const headers = {Origin:origin,'Content-Type':'application/json',Cookie:'tikdam_session='+sessionId,
+    'X-AI-Provider':'baseten','Idempotency-Key':crypto.randomUUID()};
+  const body = {purpose:'intake',facts:{mode:'before',country:'IN',businessCountry:'IN'},
+    history:[{role:'user',content:'Fictional stationery purchase'}]};
+  const post = (path, data, extra={})=>app.fetch(new Request(origin+path,{
+    method:'POST',headers:{...headers,...extra},body:JSON.stringify(data)
+  }),env);
+  async function chat(token){return (await post('/api/chat',body,{'X-Turnstile-Token':token})).json();}
+  assert.equal((await chat('fixture-invalid')).code,'CHALLENGE_INVALID');
+  assert.equal(generations,0);
+  assert.equal((await chat('fixture-valid')).provider,'Baseten');
+  assert.equal((await chat('fixture-valid')).code,'ALREADY_PROCESSED');
+  assert.equal((await post('/api/session/clear',{})).status,200);
+  assert.equal((await chat('fixture-valid')).code,'SESSION_REQUIRED');
+  assert.equal(generations,1);
+  const rows=await db.prepare('SELECT status,estimated_microusd FROM ai_reservations').all();
+  assert.deepEqual(rows.results,[{status:'succeeded',estimated_microusd:880}]);
 });
