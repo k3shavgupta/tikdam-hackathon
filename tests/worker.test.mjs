@@ -36,12 +36,12 @@ test('landing, checker, and owner dashboard use their intended assets',async()=>
   return new Response(path,{headers:{'Content-Type':'text/html'}});
  }}};
  const owner=createHandler({adminVerifier:async()=>({subject:'owner',email:'owner@example.test'})});
- for(const [route,asset] of [['/','/'],['/app','/app/index.html'],['/app/purchase','/app/index.html'],['/admin','/app/index.html']]){
+ for(const [route,asset] of [['/','/index.html'],['/app','/app/index.html'],['/app/purchase','/app/index.html'],['/admin','/app/index.html']]){
   const response=await owner.fetch(request(route),assets,{});
   assert.equal(response.status,200);
   assert.equal(await response.text(),asset);
  }
- assert.deepEqual(paths,['/','/app/index.html','/app/index.html','/app/index.html']);
+ assert.deepEqual(paths,['/index.html','/app/index.html','/app/index.html','/app/index.html']);
 });
 test('cross-origin and unapproved-host mutations are blocked',async()=>{
  assert.equal((await api.fetch(request('/api/plan',facts,{Origin:'https://evil.test'}),env,{})).status,403);

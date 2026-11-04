@@ -65,11 +65,12 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
       if(!isApi){
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Method not allowed.');
         if(!env.ASSETS)throw safeError('ASSETS_UNAVAILABLE',503,'Application assets are not configured.');
-        if(/^\/app(?:\/(?:purchase|before|client|sign-in(?:\/.*)?|sign-up(?:\/.*)?)?)?\/?$/i.test(path)){
+        if(lower==='/app/index.html' || /^\/app(?:\/(?:purchase|before|client|sign-in(?:\/.*)?|sign-up(?:\/.*)?)?)?\/?$/i.test(path)){
           const asset=await env.ASSETS.fetch(new Request(new URL('/app/index.html',request.url),{method:request.method,headers:request.headers}));
           return securityHeaders(new Response(asset.body,{status:asset.status,headers:asset.headers}),{clerkOrigin:clerkConfig(env).frontendOrigin});
         }
-        return securityHeaders(await env.ASSETS.fetch(request));
+        const assetRequest = path === '/' ? new Request(new URL('/index.html',request.url),request) : request;
+        return securityHeaders(await env.ASSETS.fetch(assetRequest));
       }
       if(path==='/api/auth/config'&&request.method==='GET'){
         const {enabled,publishableKey}=clerkConfig(env);
