@@ -10,7 +10,7 @@ const appHtml=path.join(dist,'index.html');
 const landingHtml=path.join(landing,'index.html');
 
 const [app,home]=await Promise.all([readFile(appHtml,'utf8'),readFile(landingHtml,'utf8')]);
-if(!app.includes('/assets/')||!home.includes('Buying a laptop?')){
+if(!app.includes('/assets/')||!home.includes('href="/app"')){
  throw new Error('Build the Vite app and static landing page before packaging.');
 }
 

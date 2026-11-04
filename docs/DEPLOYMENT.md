@@ -1,8 +1,10 @@
-# Deployment notes
+# Deployment
 
-The app is served at [tikdam.xyz](https://tikdam.xyz), with a staging preview at [tikdam-v1-staging.k3shavgupta.workers.dev](https://tikdam-v1-staging.k3shavgupta.workers.dev). Public AI remains disabled until owner access, Turnstile and the live browser flow are configured and verified. A working manual path and build/tests do not establish live model availability.
+GitHub repository `k3shavgupta/tikdam-hackathon`, branch `main`, contains the landing page, checker and Worker. Wrangler publishes the combined build. A push alone does not deploy it. Use the release commands in the root README from this checkout.
 
-For a separate Cloudflare deployment, create your own D1 databases and replace the zero UUIDs in `wrangler.jsonc`; configure your own account, domain routes and secrets. Never commit `.env.local`, `.dev.vars` or real credentials. Run `npm ci`, `npm --prefix landing ci`, `npm test` and `npm run build` before deployment. The repository does not include account-specific Access/Turnstile setup automation.
+On November 3 the live homepage and checker HTML matched the separate local release directory byte for byte. GitHub lagged behind production Worker `fde90d1e-a61d-4a63-9be1-e3020e35c4e9`. The source reconciliation includes Baseten chat, the optional customer account, session revocation, topic counters, and the CSP-compatible landing build. Account-specific settings and provider credentials stay on Cloudflare. D1 records processing failures and budget estimates for the owner dashboard. Worker request logging is disabled. Inspect the ledger before retrying any ambiguous provider failure.
+
+## Earlier releases
 
 ## Worldwide evidence preparation — 2 November 2026
 

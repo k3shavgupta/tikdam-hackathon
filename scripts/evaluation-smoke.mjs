@@ -16,7 +16,8 @@ assert.match((await get(asset,200)).headers.get('content-type'), /javascript/);
 const config = await (await get('/api/config',200)).json();
 assert.equal(new Set(config.countries.map(c => c.code)).size, 250);
 assert.equal(config.countries.filter(c => c.sources?.length).length, 11);
-assert.equal(config.ai.chatAvailable, production);
+if (!production) assert.equal(config.ai.chatAvailable, false);
+else if (!config.ai.chatAvailable) assert.ok(config.ai.reason, 'A paused assistant must explain why');
 assert.equal(config.ai.extractionAvailable, false);
 if (production) {
   assert.equal(config.provider, 'Baseten');
@@ -26,7 +27,7 @@ for (const path of ['/admin','/api/admin/overview','/api/admin/evaluation']) {
   const response = await get(path, production ? 302 : 403);
   if (production) assert.match(new URL(response.headers.get('location')).hostname, /\.cloudflareaccess\.com$/);
 }
-for(const path of ['/.env.local','/server/evaluation/schema.sql','/api/missing'])await get(path,404);
+for(const path of ['/.env.local','/server/evaluation/schema.sql','/api/missing','/unlisted-page','/app/unlisted-page'])await get(path,404);
 const pre=await(await post('/api/plan',{mode:'before',country:'GB',businessCountry:'GB',item:'Fictional office stationery'})).json();assert.equal(pre.guaranteedRefund,false);
 for(const country of ['IN','GB','SG']){const data=await(await post('/api/assess',purchaseFacts(country))).json();assert.equal(data.status,'conditional');assert.equal(data.benefit.amount,'20.00');assert.equal(data.cashRefund,null);assert.equal(data.verification,'user_assertions_only');}
 const unconfirmed=await(await post('/api/assess',{...purchaseFacts('GB'),invoiceConfirmed:false})).json();assert.equal(unconfirmed.benefit.amount,null);

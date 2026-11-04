@@ -5,8 +5,8 @@ Tikdam helps freelancers and small businesses prepare before buying, review purc
 - Homepage: https://tikdam.xyz
 - Purchase checker: https://tikdam.xyz/app
 - Preview: https://tikdam-v1-staging.k3shavgupta.workers.dev
-- Owner dashboard: https://tikdam.xyz/admin, denied until Cloudflare Access is configured.
-- Public AI is disabled pending Access/Turnstile configuration. The private, budgeted evaluation successfully exercised Meta with fictional chat/PDF/image inputs; see `docs/evaluation/RESULTS.md`. Owner login and public browser AI are not yet verified.
+- Owner dashboard: https://tikdam.xyz/admin, protected by Cloudflare Access.
+- Production uses Baseten for optional text chat. Check /api/config for current availability. Invoice extraction is paused. Guests can use the manual checker.
 
 ## Run and verify
 
@@ -29,9 +29,9 @@ See `docs/BUILD-STATUS.md` for the build record and `docs/DEPLOYMENT.md` for dep
 ## What V1 does
 
 - Before buying: source-linked country guidance, actual legal purchaser details, business-use/evidence checklist, and a copyable seller request.
-- Purchase review: manual facts or consented image/PDF extraction, uncertainty, editable fields, invoice confirmation, arithmetic/identity/date/regime checks, and a JSON preparation pack.
+- Purchase review: manual invoice facts, uncertainty, editable fields, invoice confirmation, arithmetic/identity/date/regime checks, and a JSON preparation pack.
 - Client payment: reconciliation and certificate request. A payment gap is not automatically tax withheld, eligible credit, or a refund.
-- Assistant: Meta selects bounded clarifications and reviewable structured proposals. For explanation, the server recomputes the result and renders server-owned statements selected by the model. The model cannot set statutory confirmations, invoice confirmation, final amounts, legal eligibility or arbitrary source URLs.
+- Assistant: the configured model selects bounded clarifications and reviewable structured proposals. For explanation, the server recomputes the result and renders server-owned statements selected by the model. The model cannot set statutory confirmations, invoice confirmation, final amounts, legal eligibility or arbitrary source URLs.
 - Private operations dashboard: activity, jobs, failures, token usage, reserved/estimated cost, recorded price versions, country coverage, explicit feedback, AI pause switch and lower-only limits. Authenticated administrative changes are audited.
 
 The dashboard records processing activity. Successful processing does not mean a claim was filed, accepted, or paid. It does not count unique people. Example interactions and repeated checks can be included.
@@ -40,7 +40,7 @@ The dashboard records processing activity. Successful processing does not mean a
 
 The selector contains 250 countries and territories, including Kosovo's user-assigned `XK` code. Eleven have researched preparation and routing guidance: India, UK, Australia, Canada, USA, Indonesia including Bali, Vietnam, Singapore, mainland China, UAE including Dubai, and Japan. Other locations provide a general invoice and evidence checklist. Their local tax rules, credits, deductions, refunds, and filing routes have not been reviewed; no numerical eligibility amount is shown. The country list is based on `i18n-iso-countries` 7.14.0 ([MIT notice](docs/COUNTRY-DATA-LICENSE.txt)); check [ISO's country-code register](https://www.iso.org/iso-3166-country-codes.html) for changes.
 
-When AI controls are enabled, the bounded assistant accepts all selectable locations. For locations without reviewed local sources, it asks about purchase or payment evidence and explains the server's general preparation result. It returns no invented official source, tax amount, eligibility or filing route. Public AI is currently paused while Turnstile and owner controls are configured; the manual worldwide workflows remain available.
+When AI controls are enabled, the bounded assistant accepts all selectable locations. For locations without reviewed local sources, it asks about purchase or payment evidence and explains the server's general preparation result. It returns no invented official source, tax amount, eligibility or filing route. The manual workflows remain available when the AI allowance runs out.
 
 Numerical results are limited conditional candidate input-tax amounts for narrow domestic operating-purchase scenarios in India, UK and Singapore. The implementation transaction window is 1 January through 1 November 2026. That is a software coverage limit, not a statement that tax law starts or ends on those dates.
 
@@ -52,13 +52,11 @@ See `docs/research/routes/2026-11-01-narrow-input-credit-routes.md`, `server/cat
 
 ## Credit controls
 
-Meta Model API is the production AI provider. A separate private evaluation adapter tried Baseten (inference403) and Modal (malformed SDK token); both are paused. Neither is a public fallback. No GPU endpoints were provisioned.
-
-Live AI requires all of: environment `AI_ENABLED=true`, the database AI switch enabled, Meta key, HMAC secret, Turnstile keys, valid session/challenge and fresh supported pricing evidence. Missing controls fail closed; manual checks remain available.
+Baseten serves text chat after consent, session validation, Turnstile, and budget admission. Production disables invoice extraction independently. The settings in D1 and Worker environment must both permit chat. Clerk sign-in is optional and does not save checks or grant owner access.
 
 Initial app limits are $5 across the entire campaign, $1 per UTC day, ten admitted paid requests per day, and one paid request in flight globally. Deployment/month changes, record cleanup, and admin purge cannot reset campaign spending. Dashboard settings can pause AI and lower limits; raising the ceiling requires a reviewed change and new user instruction.
 
-For the currently configured standard `muse-spark-1.3`, the app reserves $0.0301 before preflight, using the full uncached price for 20,000 input tokens and 1,200 output tokens including reasoning. Meta counts the exact rendered input before a single generation request. Oversized inputs are rejected. There are no hosted tools, agent loops or automatic paid retries. Prices and limits are recorded in `server/ai/pricing.json` with official sources.
+Each Baseten request reserves up to $0.0301 at the configured price, with at most 20,000 input and 1,200 output tokens. The adapter bounds request size before admission. The service makes no automatic paid retry. See `server/ai/baseten-pricing.json` for the price assumptions.
 
 Validated returned usage determines estimated cost. Unknown generation usage and generation timeouts retain the allowance and pause AI. A preflight-only failure releases its reservation because generation was not requested. Provider billing is authoritative. Token preflight is not a provider invoice, and the app estimate is not an account-level billing guarantee. Pricing expires after thirty days unless reviewed.
 
@@ -72,11 +70,11 @@ See `docs/evaluation/TEST-PLAN.md`, `PROVIDER-SETUP.md`, `RESULTS.md` and `COSTS
 
 ## Data handling
 
-Bills, profile details, extracted facts and conversations remain transient in browser/server memory. Selecting a bill does not upload it. Explicit consent and a deliberate action are required to transmit a document or assistant conversation/form facts to Meta. User confirmation remains necessary after extraction. `store:false` requests no stored response but does not override Meta's separate logs, retention or terms.
+Manual entries go to Tikdam for calculation. Optional chat sends recent conversation and selected case details to Baseten. Named form fields for identifiers, names, invoice number and address are replaced with presence indicators. Free text is transmitted as typed. Provider retention is governed separately.
 
-D1 stores opaque session/job identifiers, coarse workflow/country, timestamps, safe status/error codes, model/token/cost metadata, settings/audit records and explicit feedback. It does not store invoice files, extracted text, tax identifiers, buyer/supplier names, bill amounts, raw prompts/responses, filenames or raw IP addresses. Feedback is optional text and may contain what the user submits; the interface asks users to omit sensitive information.
+D1 stores opaque session/job identifiers, coarse chat topic and workflow/country, timestamps, safe status/error codes, model/token/cost metadata, settings/audit records and explicit feedback. It does not store invoice files, extracted text, tax identifiers, buyer/supplier names, bill amounts, raw prompts/responses, filenames or raw IP addresses. Feedback is optional text and may contain what the user submits; the interface asks users to omit sensitive information.
 
-Operational records become eligible for bounded daily cleanup after thirty days and feedback after ninety days. Processing a backlog can take longer. A minimal campaign/idempotency spending ledger remains to prevent resetting the cap. Administrative audit records also remain. Clearing a session clears browser facts and expires its cookie; it does not erase retained operational/budget records. No advertising trackers or invoice archive are included.
+Operational records become eligible for bounded daily cleanup after thirty days and feedback after ninety days. Processing a backlog can take longer. A minimal campaign/idempotency spending ledger remains to prevent resetting the cap. Administrative audit records also remain. Clearing a session clears browser facts and revokes the anonymous session and expires its cookie; it does not erase retained operational/budget records. No advertising trackers or invoice archive are included.
 
 Admin pages and APIs require server-verified Cloudflare Access JWT signature, issuer, audience, expiry and owner allowlist. Unconfigured authentication denies access. Production workers.dev and version previews are disabled. CSP, exact origins, Turnstile validation, shared throttles, bounded uploads and safe errors apply. No security certification is implied.
 
@@ -84,13 +82,14 @@ Admin pages and APIs require server-verified Cloudflare Access JWT signature, is
 
 ```sh
 npx wrangler whoami
-npm run db:staging
 npm run deploy:staging
-npm run db:production
+npm run test:browser -- https://tikdam-v1-staging.k3shavgupta.workers.dev
 npm run deploy:production
+node scripts/evaluation-smoke.mjs https://tikdam.xyz
+npm run test:browser -- https://tikdam.xyz
 ```
 
-The checked-in `wrangler.jsonc` uses placeholder D1 IDs and omits the account ID. Configure your own Cloudflare account, D1 databases, routes and secrets before remote deployment. An optional separate scoped Cloudflare token for Access/Turnstile management may lack deployment permissions; do not replace the deployment identity with that token unintentionally.
+Release from a clean main checkout. The release script discovers the existing D1 binding, preserves runtime variables and secrets and tags the Worker with the Git commit. Production also checks that the commit matches remote main. For schema changes, apply the reviewed migrations to each environment before deploying code that depends on them.
 
 Cloudflare serves only built `dist` assets. D1 databases are separate for staging and production. The live `www` host redirects to the apex. See the deployment notes before configuring a separate account or domain.
 

@@ -1,3 +1,5 @@
+Current deployment instructions and release status are in [Deployment](DEPLOYMENT.md). The entries below are historical.
+
 # V1 build evidence
 
 Execution started 1 November 2026 from the existing local app. The first bullets record the initial baseline; later sections record completed verification.
