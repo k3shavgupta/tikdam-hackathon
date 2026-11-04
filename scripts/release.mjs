@@ -5,6 +5,9 @@ import path from 'node:path';
 
 const target = process.argv[2];
 if (!['production', 'staging'].includes(target)) throw Error('Choose production or staging.');
+const providerOption = process.argv[3];
+if (providerOption && providerOption !== '--ai-provider=meta')
+  throw Error('The only supported provider override is --ai-provider=meta.');
 const git = (...args) => execFileSync('git',args,{encoding:'utf8'}).trim();
 const sha = git('rev-parse','HEAD');
 if (git('status','--porcelain') || git('branch','--show-current') !== 'main') throw Error('Release from a clean main checkout.');
@@ -23,8 +26,10 @@ const template = JSON.parse(readFileSync('wrangler.jsonc','utf8'));
 const config = {...template,...(target==='production'?template.env.production:{})};
 delete config.env;
 delete config.$schema;
-// Keep existing account managed variables and secrets, including the live AI switches.
+// Keep existing account managed variables and secrets, including the live AI
+// enable switch. An explicit provider repair changes only AI_PROVIDER.
 delete config.vars;
+if (providerOption) config.vars = {AI_PROVIDER: 'meta'};
 config.main = path.resolve(config.main);
 config.assets.directory = path.resolve(config.assets.directory);
 config.d1_databases[0].database_id = db[0].database_id;

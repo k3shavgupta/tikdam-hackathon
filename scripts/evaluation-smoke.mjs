@@ -20,8 +20,8 @@ if (!production) assert.equal(config.ai.chatAvailable, false);
 else if (!config.ai.chatAvailable) assert.ok(config.ai.reason, 'A paused assistant must explain why');
 assert.equal(config.ai.extractionAvailable, false);
 if (production) {
-  assert.equal(config.provider, 'Baseten');
-  assert.equal(config.model, 'meta-models/muse-spark-open-1026');
+  assert.equal(config.provider, 'Meta Model API');
+  assert.equal(config.model, 'muse-spark-1.3');
 }
 for (const path of ['/admin','/api/admin/overview','/api/admin/evaluation']) {
   const response = await get(path, production ? 302 : 403);

@@ -6,7 +6,7 @@ Tikdam helps freelancers and small businesses prepare before buying, review purc
 - Purchase checker: https://tikdam.xyz/app
 - Preview: https://tikdam-v1-staging.k3shavgupta.workers.dev
 - Owner dashboard: https://tikdam.xyz/admin, protected by Cloudflare Access.
-- Production uses Baseten for optional text chat. Check /api/config for current availability. Invoice extraction is paused. Guests can use the manual checker.
+- Production uses Meta Model API for optional text chat. Check /api/config for current availability. Invoice extraction is paused. Guests can use the manual checker.
 
 ## Run and verify
 
@@ -52,11 +52,11 @@ See `docs/research/routes/2026-11-01-narrow-input-credit-routes.md`, `server/cat
 
 ## Credit controls
 
-Baseten serves text chat after consent, session validation, Turnstile, and budget admission. Production disables invoice extraction independently. The settings in D1 and Worker environment must both permit chat. Clerk sign-in is optional and does not save checks or grant owner access.
+Meta Model API serves text chat after consent, session validation, Turnstile, and budget admission. Production disables invoice extraction independently. The settings in D1 and Worker environment must both permit chat. Clerk sign-in is optional and does not save checks or grant owner access.
 
 Initial app limits are $5 across the entire campaign, $1 per UTC day, ten admitted paid requests per day, and one paid request in flight globally. Deployment/month changes, record cleanup, and admin purge cannot reset campaign spending. Dashboard settings can pause AI and lower limits; raising the ceiling requires a reviewed change and new user instruction.
 
-Each Baseten request reserves up to $0.0301 at the configured price, with at most 20,000 input and 1,200 output tokens. The adapter bounds request size before admission. The service makes no automatic paid retry. See `server/ai/baseten-pricing.json` for the price assumptions.
+Each Meta request reserves up to $0.0301 at the configured price, with at most 20,000 input and 1,200 output tokens. The adapter verifies input tokens before generation. The service makes no automatic paid retry. See `server/ai/pricing.json` for the price assumptions.
 
 Validated returned usage determines estimated cost. Unknown generation usage and generation timeouts retain the allowance and pause AI. A preflight-only failure releases its reservation because generation was not requested. Provider billing is authoritative. Token preflight is not a provider invoice, and the app estimate is not an account-level billing guarantee. Pricing expires after thirty days unless reviewed.
 
@@ -70,7 +70,7 @@ See `docs/evaluation/TEST-PLAN.md`, `PROVIDER-SETUP.md`, `RESULTS.md` and `COSTS
 
 ## Data handling
 
-Manual entries go to Tikdam for calculation. Optional chat sends recent conversation and selected case details to Baseten. Named form fields for identifiers, names, invoice number and address are replaced with presence indicators. Free text is transmitted as typed. Provider retention is governed separately.
+Manual entries go to Tikdam for calculation. Optional chat sends recent conversation and selected case details to Meta Model API. Named form fields for identifiers, names, invoice number and address are replaced with presence indicators. Free text is transmitted as typed. Provider retention is governed separately.
 
 D1 stores opaque session/job identifiers, coarse chat topic and workflow/country, timestamps, safe status/error codes, model/token/cost metadata, settings/audit records and explicit feedback. It does not store invoice files, extracted text, tax identifiers, buyer/supplier names, bill amounts, raw prompts/responses, filenames or raw IP addresses. Feedback is optional text and may contain what the user submits; the interface asks users to omit sensitive information.
 
@@ -90,6 +90,8 @@ npm run test:browser -- https://tikdam.xyz
 ```
 
 Release from a clean main checkout. The release script discovers the existing D1 binding, preserves runtime variables and secrets and tags the Worker with the Git commit. Production also checks that the commit matches remote main. For schema changes, apply the reviewed migrations to each environment before deploying code that depends on them.
+
+To change an existing deployment from Baseten to Meta while preserving its other runtime variables and secrets, append `-- --ai-provider=meta` to the deployment command. Refresh an open chat tab after the switch so the consent names the current provider.
 
 Cloudflare serves only built `dist` assets. D1 databases are separate for staging and production. The live `www` host redirects to the apex. See the deployment notes before configuring a separate account or domain.
 
