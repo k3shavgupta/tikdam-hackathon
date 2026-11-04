@@ -4,6 +4,7 @@ import {AssistantPanel} from "./components/AssistantPanel.jsx";
 import {FeedbackPanel} from "./components/FeedbackPanel.jsx";
 import {TurnstileChallenge} from "./components/TurnstileChallenge.jsx";
 import {AccountControls} from './auth/CustomerAuth.jsx';
+import {categories, modes} from './field-display.mjs';
 const defaults = {
   mode: "before",
   country: "IN",
@@ -38,16 +39,7 @@ const defaults = {
   region: "",
   indiaChecks: {purchaseKind:"unknown",received:"unknown",invoiceValid:"unknown",gstr2bAvailable:"unknown",supplierTaxPaid:"unknown",returnFiled:"unknown",notBlocked:"unknown",domesticForwardCharge:"unknown",claimPeriodOpen:"unknown"},
 };
-const modes = [
-  ["before", "Before you buy", "Get the invoice right from the start.", "↗"],
-  ["purchase", "Review a bill", "Read it, check it, find your next step.", "▤"],
-  [
-    "client",
-    "Check a client payment",
-    "Understand tax deducted from your pay.",
-    "⇄",
-  ],
-];
+const scopeDate = new Intl.DateTimeFormat('en-GB', {day:'numeric', month:'short', year:'numeric', timeZone:'UTC'});
 const api = (path, body, options) => requestApi("/api/"+path, body, options);
 function Field({ label, children, hint, wide = false }) {
   return (
@@ -142,6 +134,18 @@ export default function App() {
     setPage(nextPage);
   }
   const country = config?.countries.find((c) => c.code === facts.country);
+  const extractionAvailable = config?.ai?.extractionAvailable ?? config?.modelConfigured;
+  const coverage = config?.coverage?.find(row => row.code === facts.country);
+  let scope = 'Tikdam has not reviewed local tax rules for this location. We can help you gather evidence and prepare questions.';
+  if (country?.sources?.length) {
+    if (facts.mode === 'client') scope = 'Compare your invoice with the payment and prepare questions about any difference.';
+    else if (facts.mode === 'before') scope = 'Get a buying checklist with billing details to request and records to keep.';
+    else if (facts.businessCountry !== facts.country) scope = 'Cross-border purchases receive an evidence checklist and questions for your preparer.';
+    else if (coverage?.purchaseEstimate === 'conditional_narrow' && coverage.transactionWindow) {
+      const {from, through} = coverage.transactionWindow;
+      scope = `Conditional estimates cover some domestic bills dated ${scopeDate.format(new Date(from))} to ${scopeDate.format(new Date(through))}. Other dates receive an evidence checklist and questions for your preparer.`;
+    } else scope = 'Get an evidence checklist and questions for your preparer.';
+  }
   function reviewDetails(){setResult(null);setDetailsOpen(true);}
   useEffect(()=>{if(detailsOpen){const panel=document.getElementById('review-details');panel?.focus({preventScroll:true});panel?.scrollIntoView?.({behavior:'instant',block:'start'});}},[detailsOpen,result]);
   useEffect(()=>{if(result)document.querySelector('.result-main')?.scrollIntoView?.({behavior:'instant',block:'start'});},[result]);
@@ -578,7 +582,7 @@ export default function App() {
                         ? "Review the route, the evidence and what to do next."
                         : "Tell Tikdam what happened or what you’re planning. We’ll take it one question at a time."}
                     </p>
-                    {!result && <p className="app-scope">Choose from {config.countries.length} locations. Local tax guidance is reviewed for 11; numerical checks cover narrow India, UK and Singapore cases.</p>}
+                    {!result && <p className="app-scope" role="status">{scope}</p>}
                   </div>
                 </div>
                 <div className="chat-layout">
@@ -805,7 +809,9 @@ export default function App() {
                           <p>
                             {facts.mode === "before"
                               ? "We’ll turn them into a checklist for you and your seller."
-                              : "Upload a document or enter its details yourself."}
+                              : extractionAvailable
+                                ? "Upload a document or enter its details yourself."
+                                : "Automatic bill reading is currently unavailable. Enter the bill details below."}
                           </p>
                         </div>
                       </div>
@@ -828,11 +834,12 @@ export default function App() {
                             ) : (
                               <div className="document-icon">▤</div>
                             )}
-                            <h3>{file ? file.name : "Drop a bill here"}</h3>
+                            <h3>{file ? file.name : extractionAvailable ? "Drop a bill here" : "Choose a bill for reference"}</h3>
                             <p>
                               PNG, JPEG, WebP or PDF · up to 6 MB · PDF up to 10
                               pages
                             </p>
+                            {!extractionAvailable && <p>The selected file stays in this browser session. Copy its details into the fields below.</p>}
                             <input
                               ref={fileRef}
                               type="file"
@@ -863,7 +870,7 @@ export default function App() {
                               Download example PDF
                             </a>
                           </div>
-                          {file && (
+                          {file && extractionAvailable && (
                             <div className="consent-block">
                               <label className="checkbox">
                                 <input
@@ -886,7 +893,7 @@ export default function App() {
                                 className="primary"
                                 disabled={
                                   !consent ||
-                                  !config.modelConfigured ||
+                                  !extractionAvailable ||
                                   Boolean(busy) || !challengeToken
                                 }
                                 onClick={extract}
@@ -896,12 +903,7 @@ export default function App() {
                                   : "Read with Muse"}{" "}
                                 <span>✦</span>
                               </button>
-                              {consent&&config.modelConfigured&&<TurnstileChallenge siteKey={config.turnstileSiteKey} action="extract" onToken={setChallengeToken} resetKey={challengeReset}/>}
-                              {!config.modelConfigured && (
-                                <small>
-                                  {config.ai?.reason || "AI is paused. Enter invoice details manually."}
-                                </small>
-                              )}
+                              {consent&&extractionAvailable&&<TurnstileChallenge siteKey={config.turnstileSiteKey} action="extract" onToken={setChallengeToken} resetKey={challengeReset}/>}
                             </div>
                           )}
                           {extraction && (
@@ -952,17 +954,7 @@ export default function App() {
                           {input("item", "e.g. office supplies or design work")}
                         </Field>
                         <Field label="Category">
-                          {select("category", [
-                            ["other", "Choose a category"],
-                            [
-                              "ordinary",
-                              "Ordinary operating supplies / services",
-                            ],
-                            ["equipment", "Equipment / capital asset"],
-                            ["vehicle", "Vehicle"],
-                            ["travel", "Travel / accommodation"],
-                            ["entertainment", "Meals / entertainment"],
-                          ])}
+                          {select("category", categories)}
                         </Field>
                         <Field label="Business use (%)">
                           {

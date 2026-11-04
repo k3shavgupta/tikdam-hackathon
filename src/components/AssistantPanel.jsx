@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {api} from '../api.mjs';
 import {TurnstileChallenge} from './TurnstileChallenge.jsx';
+import {fieldLabel, fieldValue} from '../field-display.mjs';
 import '../admin.css';
 
 export function AssistantPanel({facts,result,config,onPropose,conversational=false,onReview,context}){
@@ -55,8 +56,8 @@ export function AssistantPanel({facts,result,config,onPropose,conversational=fal
    <details className="chat-sharing"><summary>What is shared?</summary><p>Tikdam replaces names, tax IDs, billing address and invoice number in form fields with presence indicators before sending. Chat messages and purchase descriptions go to {provider} as written. Tikdam keeps a broad topic label and a separate spending record, not your question text.</p></details>
    {needsChallenge&&<TurnstileChallenge siteKey={config.turnstileSiteKey} action="chat" onToken={setChallenge} resetKey={resetKey}/>}
    <div className="tk-actions"><button type="button" className="tk-primary" disabled={busy||!draft.trim()||!consent||!challenge} onClick={()=>send('intake')}>{busy?'Sending…':'Send question'}</button>{result&&<button type="button" className="tk-secondary" disabled={busy||!consent||!challenge} onClick={()=>send('explain')}>Explain current result</button>}</div>
-   {pending&&Object.keys(pending.proposals||{}).length>0&&<div className="tk-proposals"><h3>Suggested form updates</h3><dl>{Object.entries(pending.proposals).map(([key,value])=><React.Fragment key={key}><dt>{key.replace(/([A-Z])/g,' $1')}</dt><dd>{typeof value==='object'?JSON.stringify(value):String(value)}</dd></React.Fragment>)}</dl><p>Applying these suggestions will clear invoice confirmation. Review the form before checking a benefit.</p><button type="button" className="tk-secondary" onClick={()=>{onPropose?.(pending.proposals);setPending(null);}}>Apply suggested fields</button></div>}
-   {pending?.missingFields?.length>0&&<p className="tk-note">Details still needed: {pending.missingFields.map(field=>field.replace(/([A-Z])/g,' $1')).join(', ')}. Reply in the chat{onReview?' or review your details.':'.'}</p>}
+   {pending&&Object.keys(pending.proposals||{}).length>0&&<div className="tk-proposals"><h3>Suggested form updates</h3><dl>{Object.entries(pending.proposals).map(([key,value])=><React.Fragment key={key}><dt>{fieldLabel(key,facts,config.countries)}</dt><dd>{fieldValue(key,value,config.countries)}</dd></React.Fragment>)}</dl><p>Applying these suggestions will clear invoice confirmation. Review the form before checking a benefit.</p><button type="button" className="tk-secondary" onClick={()=>{onPropose?.(pending.proposals);setPending(null);}}>Apply suggested fields</button></div>}
+   {pending?.missingFields?.length>0&&<p className="tk-note">Details still needed: {pending.missingFields.map(field=>fieldLabel(field,facts,config.countries)).join(', ')}. Reply in the chat{onReview?' or review your details.':'.'}</p>}
    {pending?.sourceIds?.length>0&&<ul className="tk-source-list">{pending.sourceIds.map(id=>sources.find(source=>source.id===id)).filter(Boolean).map(source=><li key={source.id}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></li>)}</ul>}
   </>}
   {error&&<p className="tk-error" role="alert">{error}</p>}

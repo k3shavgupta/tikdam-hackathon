@@ -41,8 +41,11 @@ test('checker uses shared brand and keeps worldwide scope in the purchase flow',
  assert.match(document.querySelector('.intro h1').textContent,/Let’s work it out/);
  assert.equal(document.querySelector('.brand img').getAttribute('src'),'/brand/logo.svg');
  assert.equal(document.querySelector('.brand').getAttribute('href'),'/');
- assert.match(document.querySelector('.app-scope').textContent,/250 locations/);
+ assert.equal(document.querySelector('[aria-label="Purchase country"]').options.length,250);
+ assert.match(document.querySelector('.app-scope').textContent,/buying checklist/);
  await click('Review a bill');
+ assert.match(document.querySelector('.app-scope').textContent,/1 Jan 2026 to 1 Nov 2026/);
+ assert.match(document.querySelector('.workspace').textContent,/Automatic bill reading is currently unavailable/);
  assert.equal(document.querySelector('[aria-label="What would you like help with?"]').selectedOptions[0].textContent,'Review a bill');
  assert.match(document.querySelector('.workspace').textContent,/India stationery checks/);
 }));

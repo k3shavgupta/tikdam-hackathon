@@ -163,7 +163,7 @@ test('assistant sends only after consent and challenge, and proposals require an
   await act(async()=>{send().click();await new Promise(resolve=>setTimeout(resolve,0));});
   const chat=requests.filter(row=>row.path==='/api/chat');assert.equal(chat.length,1);
   assert.deepEqual(JSON.parse(chat[0].options.body),{purpose:'intake',facts,history:[{role:'user',content:'I want office supplies.'}]});
-  assert.equal(applied.length,0);assert.match(d.body.textContent,/Details still needed: registration/);
+  assert.equal(applied.length,0);assert.match(d.body.textContent,/Details still needed: Registration in purchase country/);
   assert.equal(d.querySelector('.tk-challenge'),null);
   await change(view,d.querySelector('textarea'),'A follow-up question.');
   assert.ok(d.querySelector('.tk-challenge'));
