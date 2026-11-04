@@ -8,6 +8,8 @@ Tikdam helps freelancers and small businesses prepare before buying, review purc
 - Owner dashboard: https://tikdam.xyz/admin, protected by Cloudflare Access.
 - Production uses Meta Model API for optional text chat. Check /api/config for current availability. Invoice extraction is paused. Guests can use the manual checker.
 
+The checker opens directly on chat. Choose the task and both locations above the message box; changing them starts a new conversation. Sending still requires consent and verification.
+
 ## Run and verify
 
 Use Node 22 or newer. Install both packages with `npm ci` and `npm --prefix landing ci`. The combined build exports the homepage at `/` and the interactive checker at `/app`.

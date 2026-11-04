@@ -3,7 +3,6 @@ import {api as requestApi, ensureSession, sendEvent, resetSession} from "./api.m
 import {AssistantPanel} from "./components/AssistantPanel.jsx";
 import {FeedbackPanel} from "./components/FeedbackPanel.jsx";
 import {TurnstileChallenge} from "./components/TurnstileChallenge.jsx";
-import {QuickSetup} from './components/QuickSetup.jsx';
 import {AccountControls} from './auth/CustomerAuth.jsx';
 const defaults = {
   mode: "before",
@@ -93,7 +92,6 @@ function updateFacts(facts, changes, countries) {
 
 export default function App() {
   const [config, setConfig] = useState(null),
-    [setupComplete,setSetupComplete] = useState(false),
     [detailsOpen,setDetailsOpen] = useState(false),
     [facts, setFacts] = useState(defaults),
     [page, setPage] = useState("work"),
@@ -144,15 +142,6 @@ export default function App() {
     setPage(nextPage);
   }
   const country = config?.countries.find((c) => c.code === facts.country);
-  function startConversation(setup){
-    generation.current++;
-    setFacts(f=>({...f,...setup,currency:config.countries.find(c=>c.code===setup.country)?.currency||'',invoiceConfirmed:false}));
-    setSetupComplete(true);setDetailsOpen(false);setResult(null);setError('');
-    sendEvent('workflow_started',setup.mode,setup.country);
-  }
-  useEffect(()=>{
-    if(setupComplete) document.getElementById('tk-assistant-title')?.focus();
-  },[setupComplete]);
   function reviewDetails(){setResult(null);setDetailsOpen(true);}
   useEffect(()=>{if(detailsOpen){const panel=document.getElementById('review-details');panel?.focus({preventScroll:true});panel?.scrollIntoView?.({behavior:'instant',block:'start'});}},[detailsOpen,result]);
   useEffect(()=>{if(result)document.querySelector('.result-main')?.scrollIntoView?.({behavior:'instant',block:'start'});},[result]);
@@ -200,7 +189,7 @@ export default function App() {
     setNotice("");
     if (fileRef.current) fileRef.current.value = "";
     setPage("work");
-    setSetupComplete(false);setDetailsOpen(false);
+    setDetailsOpen(false);
   }
   async function run() {
     setError("");
@@ -568,9 +557,6 @@ export default function App() {
               </article>
             ) : null}
             <div hidden={page !== "work"}>
-            {!setupComplete ? (
-              <QuickSetup key={sessionVersion} facts={facts} countries={config.countries} coverage={config.coverage} modes={modes} onStart={startConversation}/>
-            ) : (
               <>
                 <div className="intro chat-intro">
                   <div>
@@ -607,7 +593,12 @@ export default function App() {
                   </div>
                 </div>
                 <div className="chat-layout">
-                  <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals} conversational onReview={reviewDetails}/>
+                  <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals} conversational onReview={reviewDetails} context={<div className="chat-context">
+                    <label><span>I want to</span><select aria-label="What would you like help with?" value={facts.mode} onChange={event=>selectMode(event.target.value)}>{modes.map(([id,title])=><option key={id} value={id}>{title}</option>)}</select></label>
+                    <label><span>{facts.mode==='client'?'Payment from':'Purchase in'}</span><select aria-label={facts.mode==='client'?'Payment country':'Purchase country'} value={facts.country} onChange={event=>edit('country',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+                    <label><span>Business based in</span><select aria-label="Business country" value={facts.businessCountry} onChange={event=>edit('businessCountry',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+                    <small>Changes start a new conversation.</small>
+                  </div>}/>
                   <aside className="conversation-receipt" aria-labelledby="check-details-title">
                     <div className="receipt-heading"><img src="/brand/icon.svg" alt=""/><h2 id="check-details-title">Your check so far</h2></div>
                     <dl>
@@ -1186,7 +1177,6 @@ export default function App() {
                 )}
                 {result&&<FeedbackPanel key={`feedback-${sessionVersion}`} mode={facts.mode} country={facts.country}/>}
               </>
-            )}
             </div>
           </>
         )}

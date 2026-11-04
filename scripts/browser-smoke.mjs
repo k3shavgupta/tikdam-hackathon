@@ -27,15 +27,15 @@ try {
     await example.click();
     assert.equal(await page.locator('.case-button[aria-pressed="true"]').innerText(),title);
     await page.locator('a[href="/app"]:visible').first().click();
-    await page.locator('input[name="setup-task"][value="purchase"]').check();
-    await page.locator('.setup-coverage').filter({hasText:/domestic bills dated/}).waitFor();
-    await page.locator('input[name="setup-task"][value="before"]').check();
-    await page.locator('.setup-form select').first().selectOption('FR');
-    await page.locator('.setup-coverage').filter({hasText:'France'}).waitFor();
+    await page.locator('.chat-context').waitFor();
+    await page.getByLabel('What would you like help with?').selectOption('purchase');
+    await page.getByLabel('Purchase country').selectOption('FR');
+    await page.getByLabel('Business country').selectOption('GB');
+    assert.match(await page.locator('.conversation-receipt').innerText(),/France/);
+    assert.match(await page.locator('.conversation-receipt').innerText(),/United Kingdom/);
     await page.getByRole('button',{name:'Coverage & sources'}).click();
     await page.getByRole('button',{name:'Back to my check'}).click();
-    assert.equal(await page.locator('.setup-form select').first().inputValue(),'FR');
-    await page.getByRole('button',{name:/Continue to chat/}).click();
+    assert.equal(await page.getByLabel('Purchase country').inputValue(),'FR');
     const draft = page.getByRole('textbox',{name:'Your question'});
     if (await draft.count()) {
       await draft.fill('Which invoice details should I ask for?');
@@ -44,14 +44,15 @@ try {
       await page.getByRole('button',{name:'Back to my check'}).click();
       assert.equal(await draft.inputValue(),'Which invoice details should I ask for?');
     }
+    await page.getByLabel('What would you like help with?').selectOption('before');
     await page.getByRole('button',{name:'Build my buying checklist'}).click();
     await page.locator('.result-main').waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1),true);
     await page.getByRole('button',{name:'Clear session'}).click();
-    await page.locator('.setup-form').waitFor();
+    await page.locator('.chat-context').waitFor();
     assert.deepEqual(errors,[]);
     assert.deepEqual(paid,[]);
-    console.log(`${width}px passed menu or desktop navigation, example selection, app entry, setup, checklist and clear.`);
+    console.log(`${width}px passed menu or desktop navigation, example selection, app entry, chat context, checklist and clear.`);
     await page.close();
   }
 } finally {

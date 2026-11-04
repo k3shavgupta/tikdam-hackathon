@@ -3,7 +3,7 @@ import {api} from '../api.mjs';
 import {TurnstileChallenge} from './TurnstileChallenge.jsx';
 import '../admin.css';
 
-export function AssistantPanel({facts,result,config,onPropose,conversational=false,onReview}){
+export function AssistantPanel({facts,result,config,onPropose,conversational=false,onReview,context}){
  const [draft,setDraft]=useState(''),[history,setHistory]=useState([]),[pending,setPending]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[consent,setConsent]=useState(false),[challenge,setChallenge]=useState(''),[resetKey,setResetKey]=useState(0);
  const generation=useRef(0);
  const sending=useRef(false);
@@ -40,7 +40,8 @@ export function AssistantPanel({facts,result,config,onPropose,conversational=fal
  }
  return <section className={`tk-assistant${conversational?' conversation-primary':''}`} aria-labelledby="tk-assistant-title">
   <div className="tk-section-heading"><h2 id="tk-assistant-title" tabIndex={-1}>Ask Tikdam</h2><span className="tk-tag">{provider==='Baseten'?'Muse Spark Open · Baseten':'Meta Muse'}</span></div>
-  <p>{conversational?'Start in your own words. We’ll ask about the details that matter.':'Describe the purchase or client payment. Tikdam can ask for missing details and suggest form updates for you to review.'}</p>
+  {context}
+  {!conversational&&<p>Describe the purchase or client payment. Tikdam can ask for missing details and suggest form updates for you to review.</p>}
   {!enabled?<><p className="tk-notice" role="status">{config?.ai?.reason||'AI is paused. Complete the form manually to continue.'}</p>{onReview&&<button className="tk-primary" onClick={onReview}>Continue with details</button>}</>:<>
    {!reviewed&&<p className="tk-notice">Local tax rules have not been reviewed for this location. The assistant can help prepare questions and evidence, but cannot determine a tax benefit or filing route.</p>}
    <div className="tk-conversation" ref={conversation} tabIndex={0} onScroll={event=>{

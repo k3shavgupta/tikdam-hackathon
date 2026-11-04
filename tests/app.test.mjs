@@ -26,7 +26,7 @@ async function mountApp(fn,{guided=false,assistant=false}={}){
   return Response.json({ok:true});
  };
  const root=createRoot(document.getElementById('root'));
- try{await act(async()=>{root.render(React.createElement(App));});if(!guided){await act(async()=>{document.querySelector('.setup-form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));});await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='Review details').click();});}await fn(dom.window.document,async(text)=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes(text));assert.ok(b,`Button ${text} exists`);await act(async()=>b.click());});}
+ try{await act(async()=>{root.render(React.createElement(App));});if(!guided){await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='Review details').click();});}await fn(dom.window.document,async(text)=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes(text));assert.ok(b,`Button ${text} exists`);await act(async()=>b.click());});}
  finally{await act(async()=>root.unmount());dom.window.close();for(const [k,v]of Object.entries(previous))v?Object.defineProperty(globalThis,k,v):delete globalThis[k];}
 }
 
@@ -80,53 +80,48 @@ test('client workflow separates payment evidence from refund entitlement',()=>mo
  assert.match(document.body.textContent,/Copy certificate request/);assert.match(document.body.textContent,/Amount not determined/);assert.match(document.body.textContent,/payment shortfall|payment gap/i);
 }));
 
-test('short setup opens a conversation with matching country and business facts, without running a check',()=>mountApp(async(document,click)=>{
- assert.ok(document.querySelector('.quick-setup'));
- assert.equal(document.querySelector('.workspace'),null);
- assert.equal(document.querySelector('.tk-assistant'),null);
- assert.equal(document.querySelectorAll('.setup-tasks input[type="radio"]').length,3);
- const selects=document.querySelectorAll('.setup-form select');
- await act(async()=>{selects[0].value='FR';selects[0].dispatchEvent(new window.Event('change',{bubbles:true}));});
- await act(async()=>document.querySelector('.setup-same input').click());
- const business=document.querySelector('.setup-business select');
- await act(async()=>{business.value='GB';business.dispatchEvent(new window.Event('change',{bubbles:true}));});
- await act(async()=>document.querySelector('.setup-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
+test('chat is available immediately and location choices update the check',()=>mountApp(async(document,click)=>{
  assert.equal(document.querySelector('.quick-setup'),null);
+ assert.ok(document.querySelector('.tk-assistant'));
+ assert.equal(document.querySelector('.workspace').hidden,true);
+ assert.equal(document.querySelector('.chat-context select').options.length,3);
+ const country=document.querySelector('[aria-label="Purchase country"]');
+ await act(async()=>{country.value='FR';country.dispatchEvent(new window.Event('change',{bubbles:true}));});
+ const business=document.querySelector('[aria-label="Business country"]');
+ assert.equal(business.value,'IN');
+ await act(async()=>{business.value='GB';business.dispatchEvent(new window.Event('change',{bubbles:true}));});
  assert.ok(document.querySelector('.conversation-primary'));
  assert.match(document.querySelector('.conversation-receipt').textContent,/France/);
  assert.match(document.querySelector('.conversation-receipt').textContent,/United Kingdom/);
  assert.equal(document.querySelector('.workspace').hidden,true);
  assert.equal(document.querySelector('.result-main'),null);
- await click('Continue with details');
+ await click('Review details');
  assert.equal(document.querySelector('.workspace').hidden,false);
  assert.equal([...document.querySelectorAll('.field')].find(x=>x.textContent.includes('Purchase / tax country'))?.querySelector('select')?.value??'FR','FR');
  await click('Back to conversation');assert.equal(document.querySelector('.workspace').hidden,true);
- await click('Clear session');assert.ok(document.querySelector('.quick-setup'));assert.equal(document.querySelector('.tk-assistant'),null);
+ await click('Clear session');assert.ok(document.querySelector('.tk-assistant'));assert.equal(document.querySelector('[aria-label="Purchase country"]').value,'IN');
 },{guided:true}));
 
-test('setup keeps business in the selected country and carries the chosen payment workflow into chat',()=>mountApp(async(document)=>{
- await act(async()=>document.querySelector('.setup-tasks input[value="client"]').click());
- const select=document.querySelector('.setup-form select');
+test('task and country choices update the opening prompt without a setup screen',()=>mountApp(async(document)=>{
+ const task=document.querySelector('[aria-label="What would you like help with?"]');
+ await act(async()=>{task.value='client';task.dispatchEvent(new window.Event('change',{bubbles:true}));});
+ const select=document.querySelector('[aria-label="Payment country"]');
  await act(async()=>{select.value='SG';select.dispatchEvent(new window.Event('change',{bubbles:true}));});
- assert.match(document.querySelector('.setup-form').textContent,/Which country is the payment from/);
- await act(async()=>document.querySelector('.setup-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
  const text=document.querySelector('.conversation-receipt').textContent;
- assert.match(text,/Check a client payment/);assert.equal((text.match(/Singapore/g)||[]).length,2);
+ assert.match(text,/Check a client payment/);assert.equal((text.match(/Singapore/g)||[]).length,1);
+ assert.match(document.querySelector('.tk-opening').textContent,/What work did you do/);
  assert.equal(document.querySelector('.workspace').hidden,true);
-},{guided:true}));
+},{guided:true,assistant:true}));
 
-test('setup explains the selected country scope before asking the user to start chat',()=>mountApp(async(document)=>{
- const form=document.querySelector('.setup-form');
- const country=form.querySelector('select');
- await act(async()=>{form.querySelector('input[value="purchase"]').click();});
- assert.match(form.querySelector('[role="status"]').textContent,/domestic bills dated 1 Jan 2026 to 1 Nov 2026/);
+test('unreviewed location warning appears beside the first message',()=>mountApp(async(document)=>{
+ const country=document.querySelector('[aria-label="Purchase country"]');
  await act(async()=>{country.value='FR';country.dispatchEvent(new window.Event('change',{bubbles:true}));});
- assert.match(form.querySelector('[role="status"]').textContent,/France.*haven’t reviewed/);
-},{guided:true}));
+ assert.match(document.querySelector('.tk-notice').textContent,/Local tax rules have not been reviewed/);
+},{guided:true,assistant:true}));
 
 test('applying a country suggestion updates the receipt and invoice currency together',()=>mountApp(async(document,click)=>{
- await act(async()=>document.querySelector('.setup-tasks input[value="purchase"]').click());
- await click('Continue to chat');
+ const task=document.querySelector('[aria-label="What would you like help with?"]');
+ await act(async()=>{task.value='purchase';task.dispatchEvent(new window.Event('change',{bubbles:true}));});
  await act(async()=>document.querySelector('.chat-starters button').click());
  await act(async()=>document.querySelector('.tk-check input').click());
  await click('Send question');
