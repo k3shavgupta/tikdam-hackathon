@@ -71,8 +71,8 @@ const cases: Record<CaseId, DemoCase> = {
       "Business-use record",
     ],
     source: {
-      label: "CBIC, CGST Act sections 16 and 17 (2021 text; check amendments)",
-      url: "https://cbic-gst.gov.in/pdf/CGST-Act-Updated-31082021.pdf",
+      label: "India Code, CGST Act sections 16 and 17",
+      url: "https://www.indiacode.nic.in/indiacode/bitstream/123456789/15689/1/A2017-12.pdf",
     },
   },
   phone: {
@@ -145,8 +145,8 @@ const cases: Record<CaseId, DemoCase> = {
     conditions: ["Recheck only if the actual use or facts differ"],
     documents: ["Keep the invoice with your records"],
     source: {
-      label: "CBIC, CGST Act sections 16 and 17 (2021 text; check amendments)",
-      url: "https://cbic-gst.gov.in/pdf/CGST-Act-Updated-31082021.pdf",
+      label: "India Code, CGST Act sections 16 and 17",
+      url: "https://www.indiacode.nic.in/indiacode/bitstream/123456789/15689/1/A2017-12.pdf",
     },
   },
   wrong: {
@@ -709,9 +709,9 @@ export default function Home() {
                 ✳
               </span>
               <p>
-                AI explains. Calculator calculates.
+                The checker uses the tax amount on your invoice.
                 <br />
-                <strong>AI never invents tax rates.</strong>
+                <strong>Review that amount and your business-use share.</strong>
               </p>
               <span className="trust-stamp">That’s the deal.</span>
             </Reveal>
@@ -734,8 +734,8 @@ export default function Home() {
                 </h2>
               </div>
               <p>
-                The picker is a route, not a promise of coverage. Tikdam names
-                the boundary before it gives a number.
+                The checker can estimate input tax on certain domestic bills dated
+                1 January through 1 November 2026. Other dates receive evidence guidance.
               </p>
             </Reveal>
             <div className="jurisdiction-grid">
@@ -756,13 +756,13 @@ export default function Home() {
               </Reveal>
               <Reveal className="jurisdiction-card preview-country">
                 <div className="country-top">
-                  <span>United Kingdom</span>
-                  <span className="country-chip">Preview</span>
+                  <span>UK and Singapore</span>
+                  <span className="country-chip">Domestic purchases</span>
                 </div>
                 <p>
-                  A narrow laptop allowance example illustrates the second
-                  jurisdiction. It is static and does not represent the current
-                  app’s calculation scope.
+                  The checker can estimate UK VAT or Singapore GST on qualifying
+                  ordinary business purchases. The UK laptop example below
+                  illustrates a separate capital allowance.
                 </p>
                 <a href="#demo" onClick={() => setSelected("uk")}>
                   Explore the UK preview{" "}
@@ -772,11 +772,12 @@ export default function Home() {
               <Reveal className="jurisdiction-card unsupported-country">
                 <div className="country-top">
                   <span>Elsewhere</span>
-                  <span className="country-chip">Unsupported case</span>
+                  <span className="country-chip">Evidence preparation</span>
                 </div>
                 <p>
-                  When no reviewed rule fits, the result says unsupported. No
-                  Indian rule gets reused for another country.
+                  Prepare a billing request, collect invoice details, or reconcile
+                  a payment. Outside the three estimate routes, the checker
+                  helps you gather evidence for local review.
                 </p>
                 <a href="#demo" onClick={() => setSelected("wrong")}>
                   See an unsupported route{" "}
@@ -818,9 +819,9 @@ export default function Home() {
                 <span className="build-marker">Existing app</span>
                 <h3>Indian prototype, now broader but still bounded</h3>
                 <p>
-                  The current checker offers a narrow India GST amount route
-                  and general preparation across 250 locations. Public chat
-                  requires consent and verification; invoice reading is paused.
+                  The checker supports evidence preparation across 250 locations,
+                  with conditional purchase estimates for India, the UK and
+                  Singapore. Use the manual forms whenever chat is unavailable.
                 </p>
               </div>
               <div>
@@ -871,9 +872,8 @@ export default function Home() {
                   Does the AI calculate the tax benefit?<span>+</span>
                 </summary>
                 <p>
-                  No. The intended architecture uses Muse Spark to clarify and
-                  explain. Validated, versioned application rules decide whether
-                  a calculation is possible and do the arithmetic.
+                  The assistant asks for details and explains results. The checker
+                  applies its published rules to the figures you confirm.
                 </p>
               </details>
               <details>

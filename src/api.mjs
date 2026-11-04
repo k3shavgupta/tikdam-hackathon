@@ -1,3 +1,6 @@
+import {countryRegions} from '../server/country-regions.mjs';
+const supportedCountries=new Set(countryRegions.map(([code])=>code));
+
 let sessionPromise=null;
 let resetPromise=null,resetError=null,sessionGeneration=0;
 const sessionChanged=()=>Object.assign(Error('The session changed. Review the current form before sending again.'),{code:'SESSION_CHANGED'});
@@ -55,6 +58,6 @@ export function resetSession(){
  resetPromise=pending;return pending;
 }
 export async function sendEvent(event,mode,country){
- if(!['workflow_started','example_loaded','pack_downloaded'].includes(event)||!['before','purchase','client'].includes(mode)||!['IN','GB','AU','CA','US','ID','VN','SG','CN','AE','JP'].includes(country))return;
+ if(!['workflow_started','example_loaded','pack_downloaded'].includes(event)||!['before','purchase','client'].includes(mode)||!supportedCountries.has(country))return;
  try{await ensureSession();await api('/api/events',{id:crypto.randomUUID(),event,mode,country});}catch{/* Operational tracking must not block the user's work. */}
 }

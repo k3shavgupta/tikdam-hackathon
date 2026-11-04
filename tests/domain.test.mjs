@@ -81,11 +81,29 @@ test("OVR Singapore GST goes to supplier correction", () => {
     country: "SG",
     businessCountry: "SG",
     currency: "SGD",
-    supplierRegime: "simplified",
+    supplierRegime: "ovr",
   });
   assert.equal(r.benefit.type, "supplier_correction");
   assert.equal(r.benefit.amount, null);
 });
+test("Singapore supplier correction requires a confirmed taxed OVR purchase by a domestic GST-registered buyer", () => {
+  const ovr = { ...facts, country: "SG", businessCountry: "SG", currency: "SGD", supplierRegime: "ovr" };
+  for (const override of [
+    { registration: "none" }, { registration: "unknown" }, { tax: "0" },
+    { businessCountry: "GB" }, { supplierRegime: "simplified" }, { invoiceConfirmed: false },
+  ]) {
+    const result = assess(factsSchema.parse({ ...ovr, ...override }));
+    assert.notEqual(result.benefit.type, "supplier_correction");
+    assert.equal(result.benefit.amount, null);
+  }
+});
+
+test("one-cent mismatches and zero net purchases require review", () => {
+  for (const override of [{ gross: "119.99" }, { net: "0", gross: "20" }]) {
+    assert.equal(assess({...facts, ...override}).benefit.amount, null);
+  }
+});
+
 test("Canadian capital assets are not blindly prorated", () => {
   const r = assess({
     ...facts,
@@ -167,6 +185,9 @@ test("client invoice produces a certificate request and separates the payment ga
   });
   assert.match(r.clientRequest, /withholding|deduction/i);
   assert.match(r.clientRequest, /PW-01/);
+  assert.equal(r.plan.route.type, "payment_reconciliation");
+  assert.deepEqual(r.plan.sources, r.sources);
+  assert.equal(r.plan.sellerRequest, undefined);
   assert.equal(r.reconciliation.gap, "12.00");
   assert.equal(r.reconciliation.unexplained, "0.00");
   assert.equal(r.cashRefund, null);

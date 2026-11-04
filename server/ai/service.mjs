@@ -65,8 +65,14 @@ export function createAiService({
   }
   async function capabilities() {
     try {
-      configuration();
-      if (!(await repository.getSettings()).aiEnabled)
+      const verified = configuration();
+      const ceiling = estimateMicrousd({inputTokens:verified.maxInputTokens, outputTokens:verified.maxOutputTokens}, verified);
+      const blocked = await repository.getBudgetBlockReason(ceiling,new Date(clock()).toISOString().slice(0,10));
+      if (blocked === 'DAILY_LIMIT' || blocked === 'BUDGET_EXHAUSTED')
+        throw aiError(blocked, blocked === 'DAILY_LIMIT'
+          ? 'The daily AI allowance has been reached. Try after midnight UTC or use manual entry.'
+          : 'The campaign AI allowance has been reached. Manual entry remains available.');
+      if (blocked === 'AI_PAUSED')
         throw aiError(
           "AI_PAUSED",
           "AI is paused to preserve credits. Manual entry remains available.",

@@ -214,7 +214,7 @@ test('dashboard does not invent evaluation traffic before a snapshot is imported
 
 test('Baseten processing consent identifies the actual selected provider',()=>{
  const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'IN'},config:{provider:'Baseten',ai:{chatAvailable:true},countries:[{code:'IN',sources:[]}]}}));
- assert.match(html,/Muse Spark Open · Baseten/);assert.match(html,/details to Baseten for processing/);assert.doesNotMatch(html,/details to Meta for processing/);
+ assert.match(html,/Muse Spark Open · Baseten/);assert.match(html,/case details to Baseten/);assert.doesNotMatch(html,/details to Meta for processing/);
 });
 
 test('conversation starter fills a draft without sending or granting consent',async()=>{

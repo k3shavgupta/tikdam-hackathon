@@ -133,7 +133,7 @@ test('applying a country suggestion updates the receipt and invoice currency tog
  assert.match(document.querySelector('.conversation-receipt').textContent,/Purchase inIndia/);
  await click('Apply suggested fields');
  const receipt=document.querySelector('.conversation-receipt');
- assert.match(receipt.textContent,/Purchase inUnited KingdomBusiness based inUnited Kingdom/);
+ assert.match(receipt.textContent,/Purchase inUnited KingdomBusiness based inIndia/);
  await click('Review details');
  const currency=[...document.querySelectorAll('label.field')].find(label=>label.textContent.includes('Currency'));
  assert.equal(currency.querySelector('input,select').value,'GBP');

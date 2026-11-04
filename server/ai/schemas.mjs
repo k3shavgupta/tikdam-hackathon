@@ -51,7 +51,13 @@ const explainOutput = z
 
 export function createChatPayload({ purpose, facts, history }) {
   const c = countries.find((c) => c.code === facts.country);
-  const plan = planPurchase(facts),
+  // The model only needs to know which identifier fields have been filled.
+  // Keep the original facts on the Worker for deterministic checks.
+  const providerFacts = { ...facts };
+  for (const field of ['legalName','billingAddress','taxId','buyerName','supplierName','supplierTaxId','invoiceNumber']) {
+    providerFacts[field] = facts[field] ? '[provided]' : '';
+  }
+  const plan = planPurchase({...facts, legalName: ''}),
     result =
       purpose === "explain" && facts.mode !== "before" ? assess(facts) : null;
   const sources = (facts.mode === "client"
@@ -118,7 +124,7 @@ export function createChatPayload({ purpose, facts, history }) {
               type: "input_text",
               text: JSON.stringify({
                 purpose,
-                facts,
+                facts: providerFacts,
                 history,
                 sourceIds: sources.map((s) => s.id),
                 localSourcesReviewed,

@@ -91,6 +91,7 @@ function fixture({
     settingsChanges = [];
   const repo = {
     getSettings: async () => ({ aiEnabled: settings }),
+    getBudgetBlockReason: async () => settings ? null : "AI_PAUSED",
     reserveAiCall: async (x) => {
       calls.push(["reserve", x]);
       return reserveReason
@@ -453,4 +454,23 @@ test('Baseten wrong model, missing key, unknown provider and mismatched price fa
  }
  const f=fixture();const service=createAiService({env:{...env,AI_PROVIDER:'baseten',BASETEN_API_KEY:'test'},repository:f.repo,pricing:verifiedPricing,clock:()=>Date.parse('2026-11-03T12:00:00Z')});
  assert.equal((await service.capabilities()).chatAvailable,false);
+});
+
+test('chat withholds structured identifiers in intake and result explanation payloads', () => {
+  const names = {legalName:'Fixture Legal',buyerName:'Fixture Buyer',supplierName:'Fixture Supplier',taxId:'FICTIONAL-TAX',supplierTaxId:'FICTIONAL-SUPPLIER-ID',billingAddress:'Fixture Address',invoiceNumber:'Fixture Invoice'};
+  for(const mode of ['before','purchase','client'])for(const purpose of ['intake','explain']){
+    const pack=createChatPayload({purpose,facts:{...facts,...names,mode},history:[{role:'user',content:'Please help.'}]});
+    const body=JSON.stringify(pack.body);
+    for(const value of Object.values(names))assert.equal(body.includes(value),false,value);
+    assert.ok(body.includes('[provided]'));
+  }
+});
+
+test('public capabilities reflect an exhausted allowance without reserving or calling the provider',async()=>{
+  const f=basetenFixture();
+  for(const reason of ['DAILY_LIMIT','BUDGET_EXHAUSTED']){
+    f.repo.getBudgetBlockReason=async(ceiling,day)=>{assert.equal(ceiling,30100);assert.equal(day,'2026-11-03');return reason;};
+    const config=await f.service.capabilities();assert.equal(config.chatAvailable,false);assert.match(config.reason,/allowance/);
+  }
+  assert.equal(f.calls.length,0);assert.equal(f.sends.length,0);
 });

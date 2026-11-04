@@ -64,7 +64,7 @@ export const factsSchema = z
       .enum(["fully", "mixed", "exempt", "unknown"])
       .default("unknown"),
     supplierRegime: z
-      .enum(["ordinary", "simplified", "unknown"])
+      .enum(["ordinary", "ovr", "simplified", "unknown"])
       .default("unknown"),
     paid: z.enum(["yes", "no", "unknown"]).default("unknown"),
     priorClaim: z.enum(["no", "yes", "unknown"]).default("unknown"),

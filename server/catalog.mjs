@@ -334,6 +334,11 @@ export const indiaCheckDefinitions = [
   { key: "claimPeriodOpen", label: "The intended claim period is open under section 16(4), including the earlier annual-return filing limit. A preparer has checked the actual dates.", provision: "CGST Act 16(4)" },
 ];
 
+export function routeVersion(code) {
+  if (["IN", "GB", "SG"].includes(code)) return `tikdam-${code.toLowerCase()}-2026-11-03.1`;
+  return reviewedCodes.has(code) ? `tikdam-${code.toLowerCase()}-2026-11-01.2` : 'tikdam-generic-2026-11-02.1';
+}
+
 export function getCoverage() {
   return countries.map((country) => {
     const numerical = ["IN", "GB", "SG"].includes(country.code);
@@ -346,7 +351,7 @@ export function getCoverage() {
       clientEstimate: reviewed ? "research_pending" : "not_reviewed",
       readiness: numerical ? "tested" : reviewed ? "guidance" : "unreviewed",
       routeId: numerical ? `${country.code.toLowerCase()}-ordinary-input-credit` : reviewed ? `${country.code.toLowerCase()}-guidance` : 'generic-evidence-preparation',
-      routeVersion: reviewed ? `tikdam-${country.code.toLowerCase()}-2026-11-01.2` : 'tikdam-generic-2026-11-02.1',
+      routeVersion: routeVersion(country.code),
       sourceChecked: reviewed ? "2026-11-01" : null,
       sourceReview: numerical ? "official_sources_checked_for_narrow_route" : reviewed ? "initial_catalogue_only" : 'not_reviewed',
       transactionWindow: numerical ? { from: "2026-01-01", through: "2026-11-01" } : null,

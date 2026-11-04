@@ -65,7 +65,7 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
       if(!isApi){
         if(request.method!=='GET'&&request.method!=='HEAD')throw safeError('METHOD_NOT_ALLOWED',405,'Method not allowed.');
         if(!env.ASSETS)throw safeError('ASSETS_UNAVAILABLE',503,'Application assets are not configured.');
-        if(lower==='/app'||lower.startsWith('/app/')){
+        if(/^\/app(?:\/(?:purchase|before|client|sign-in(?:\/.*)?|sign-up(?:\/.*)?)?)?\/?$/i.test(path)){
           const asset=await env.ASSETS.fetch(new Request(new URL('/app/index.html',request.url),{method:request.method,headers:request.headers}));
           return securityHeaders(new Response(asset.body,{status:asset.status,headers:asset.headers}),{clerkOrigin:clerkConfig(env).frontendOrigin});
         }
@@ -118,12 +118,14 @@ export function createHandler({repositoryFactory=defaultRepo,aiFactory=defaultAi
       if(path==='/api/session'&&request.method==='POST'){
         z.object({}).strict().parse(await readJson(request,1024));
         const repository=await repositoryFactory(env.DB);
+        const session=await currentSession(request,repository,false);
+        if(session)return securityHeaders(json({ok:true}));
         const clientKey=await throttleKey(request,env,'session');
         await throttle(repository,{key:clientKey,limit:12,windowSeconds:3600});
-        let session=await currentSession(request,repository,false);
-        if(!session){const id=crypto.randomUUID();await repository.createSession({id,expiresAt:new Date(Date.now()+12*3600000).toISOString()});session={id};}
+        const id=crypto.randomUUID();
+        await repository.createSession({id,expiresAt:new Date(Date.now()+12*3600000).toISOString()});
         const secure=new URL(request.url).protocol==='https:'?'; Secure':'';
-        return securityHeaders(json({ok:true},200,{'Set-Cookie':`tikdam_session=${session.id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`}));
+        return securityHeaders(json({ok:true},200,{'Set-Cookie':`tikdam_session=${id}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200${secure}`}));
       }
       if(['/api/events','/api/feedback'].includes(path)&&request.method==='POST'){
         const body=(path==='/api/events'?eventSchema:feedbackSchema).parse(await readJson(request,8192));

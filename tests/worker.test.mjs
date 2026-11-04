@@ -208,3 +208,11 @@ test('provider requests work in workerd and never follow a redirect with the API
     assert.deepEqual(urls,Array(2).fill('https://inference.baseten.co/v1/chat/completions'));
   } finally {await fixture.dispose();}
 });
+
+test('a valid session survives exhausted session-creation quota without extending its expiry',async()=>{
+ const guarded=createHandler({repositoryFactory:()=>({...repository,consumeThrottle:async()=>({allowed:false})})});
+ const cookie='tikdam_session=11111111-1111-4111-8111-111111111111';
+ const existing=await guarded.fetch(request('/api/session',{}, {Cookie:cookie}),env,{});
+ assert.equal(existing.status,200);assert.equal(existing.headers.get('set-cookie'),null);
+ assert.equal((await guarded.fetch(request('/api/session',{}),env,{})).status,429);
+});

@@ -24,8 +24,8 @@ test('session clear is explicit and feedback or events do not include arbitrary 
  try{
   await resetSession();await Promise.all([ensureSession(),ensureSession()]);
   assert.equal(requests.filter(x=>x.path==='/api/session').length,1);
-  await sendEvent('workflow_started','purchase','IN');const body=JSON.parse(requests.find(x=>x.path==='/api/events').options.body);
-  assert.deepEqual(Object.keys(body).sort(),['country','event','id','mode']);
+  await sendEvent('workflow_started','purchase','FR');const body=JSON.parse(requests.find(x=>x.path==='/api/events').options.body);
+  assert.equal(body.country,'FR');assert.deepEqual(Object.keys(body).sort(),['country','event','id','mode']);
   assert.equal(requests.some(x=>x.path==='/api/session/clear'),true);
  }finally{globalThis.fetch=original;}
 });

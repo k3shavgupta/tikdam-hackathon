@@ -246,6 +246,8 @@ test("strict caps and daily call counts persist and cannot be raised or cleared 
     reservationId: first.reservationId,
     status: "failed_before_send",
   });
+  assert.equal(await r.getBudgetBlockReason(30100, "2026-11-01"), "DAILY_LIMIT");
+  assert.equal(await r.getBudgetBlockReason(30100, "2026-11-02"), null);
   assert.equal((await r.reserveAiCall(call())).reason, "DAILY_LIMIT");
   await assert.rejects(
     () => r.updateSettings({ actor, patch: { dailyCallCap: 2 } }),

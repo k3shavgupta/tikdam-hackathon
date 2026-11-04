@@ -32,7 +32,18 @@ try {
     await page.locator('input[name="setup-task"][value="before"]').check();
     await page.locator('.setup-form select').first().selectOption('FR');
     await page.locator('.setup-coverage').filter({hasText:'France'}).waitFor();
+    await page.getByRole('button',{name:'Coverage & sources'}).click();
+    await page.getByRole('button',{name:'Back to my check'}).click();
+    assert.equal(await page.locator('.setup-form select').first().inputValue(),'FR');
     await page.getByRole('button',{name:/Continue to chat/}).click();
+    const draft = page.getByRole('textbox',{name:'Your question'});
+    if (await draft.count()) {
+      await draft.fill('Which invoice details should I ask for?');
+      await page.getByRole('button',{name:'Your data'}).click();
+      assert.equal(await draft.isVisible(),false);
+      await page.getByRole('button',{name:'Back to my check'}).click();
+      assert.equal(await draft.inputValue(),'Which invoice details should I ask for?');
+    }
     await page.getByRole('button',{name:'Build my buying checklist'}).click();
     await page.locator('.result-main').waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1),true);

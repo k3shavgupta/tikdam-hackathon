@@ -84,8 +84,9 @@ function Sources({ sources = [] }) {
 function updateFacts(facts, changes, countries) {
   const next = {...facts, invoiceConfirmed: false};
   if (changes.country && changes.country !== facts.country) {
-    next.currency = countries.find(country => country.code === changes.country)?.currency || '';
-    if (facts.businessCountry === facts.country) next.businessCountry = changes.country;
+    // Preserve the established business location and the currency of entered amounts.
+    const hasAmounts = ["net", "tax", "gross", "amountReceived", "withheld"].some(key => facts[key] !== "");
+    if (!hasAmounts) next.currency = countries.find(country => country.code === changes.country)?.currency || '';
   }
   return {...next, ...changes};
 }
@@ -109,7 +110,9 @@ export default function App() {
     [challengeReset,setChallengeReset] = useState(0),
     [sessionVersion,setSessionVersion] = useState(0);
   const fileRef = useRef(null),
-    heading = useRef(null),
+    infoHeading = useRef(null),
+    resultHeading = useRef(null),
+    returnFocus = useRef(null),
     generation = useRef(0);
   function loadConfig() {
     setError("");
@@ -127,9 +130,19 @@ export default function App() {
     [preview],
   );
   useEffect(() => {
-    if (result || page !== "work")
-      heading.current?.focus({ preventScroll: true });
-  }, [result, page]);
+    if (page !== "work") infoHeading.current?.focus();
+    else if (returnFocus.current) {
+      returnFocus.current.focus();
+      returnFocus.current = null;
+    }
+  }, [page]);
+  useEffect(() => {
+    if (result) resultHeading.current?.focus({preventScroll: true});
+  }, [result]);
+  function showInfo(event, nextPage) {
+    returnFocus.current = event.currentTarget;
+    setPage(nextPage);
+  }
   const country = config?.countries.find((c) => c.code === facts.country);
   function startConversation(setup){
     generation.current++;
@@ -471,10 +484,10 @@ export default function App() {
         </a>
         <nav>
           <a className="home-link" href="/">Home</a>
-          <button onClick={() => setPage("coverage")}>
+          <button onClick={event => showInfo(event, "coverage")}>
             Coverage & sources
           </button>
-          <button onClick={() => setPage("privacy")}>Your data</button>
+          <button onClick={event => showInfo(event, "privacy")}>Your data</button>
           <button className="reset" onClick={clear}>
             Clear session
           </button>
@@ -489,7 +502,7 @@ export default function App() {
             {page === "coverage" ? (
               <>
                 <div className="intro compact">
-                  <h1 tabIndex={-1} ref={heading}>
+                  <h1 tabIndex={-1} ref={infoHeading}>
                     Know what’s covered.
                   </h1>
                   <p>
@@ -519,7 +532,7 @@ export default function App() {
             ) : page === "privacy" ? (
               <article className="privacy-page">
                 <p>Optional accounts are managed by Clerk, which processes your sign-in and account details. Tikdam verifies your account session but does not save checks or conversations to your account yet. Clear session clears your working check; use the account menu to sign out.</p>
-                <h1 tabIndex={-1} ref={heading}>
+                <h1 tabIndex={-1} ref={infoHeading}>
                   Your invoice, your choice.
                 </h1>
                 <p>
@@ -541,7 +554,7 @@ export default function App() {
                   invoice to Meta. A downloaded review pack contains the invoice
                   facts you entered and should be kept securely.
                 </p>
-                <p>Asking the assistant sends the conversation and entered form facts to {config.provider === 'Baseten' ? 'Baseten' : 'Meta'} only after your consent and an explicit request. Invoice selection alone does not upload a file. Clearing the session resets browser fields and the anonymous session cookie; retained operational records follow the periods above. Feedback is optional. Avoid private identifiers in feedback.</p>
+                <p>Asking the assistant sends recent messages and case details to {config.provider === 'Baseten' ? 'Baseten' : 'Meta'} after you consent and send a message. Tikdam replaces the names, tax identifiers, billing address and invoice number in their form fields with presence indicators before contacting the provider. Free-text messages and purchase descriptions are sent as written. Invoice selection alone does not upload a file. Clearing the session resets browser fields and the anonymous session cookie; retained operational records follow the periods above. Feedback is optional. Avoid private identifiers in feedback.</p>
                 <a
                   href="https://dev.meta.ai/legal/terms-of-service"
                   target="_blank"
@@ -553,8 +566,10 @@ export default function App() {
                   Back to my check
                 </button>
               </article>
-            ) : !setupComplete ? (
-              <QuickSetup facts={facts} countries={config.countries} coverage={config.coverage} modes={modes} onStart={startConversation}/>
+            ) : null}
+            <div hidden={page !== "work"}>
+            {!setupComplete ? (
+              <QuickSetup key={sessionVersion} facts={facts} countries={config.countries} coverage={config.coverage} modes={modes} onStart={startConversation}/>
             ) : (
               <>
                 <div className="intro chat-intro">
@@ -635,7 +650,7 @@ export default function App() {
                           Synthetic example · not an OCR result
                         </div>
                       )}
-                      <h2 tabIndex={-1} ref={heading}>
+                      <h2 tabIndex={-1} ref={resultHeading}>
                         {facts.mode === "before"
                           ? "Get the billing right."
                           : result.title}
@@ -656,7 +671,7 @@ export default function App() {
                           <p>
                             {result.benefit.amount !== null
                               ? "A potential offset in a return, subject to conditions. This is not a promised cash refund."
-                              : "Resolve the conditions below before expecting a credit or cash payment."}
+                              : "Review the evidence and next steps below."}
                           </p>
                           {result.calculation && (
                             <div className="formula">{result.calculation}</div>
@@ -712,7 +727,7 @@ export default function App() {
                               ))}
                             </ul>
                           )}
-                          <h3>How to move the claim forward</h3>
+                          <h3>Next steps</h3>
                           <ol className="next-steps">
                             {result.nextSteps.map((x) => (
                               <li key={x}>{x}</li>
@@ -720,7 +735,7 @@ export default function App() {
                           </ol>
                           <details className="more">
                             <summary>
-                              Invoice preparation & evidence checklist
+                              {facts.mode === "client" ? "Payment evidence checklist" : "Invoice preparation & evidence checklist"}
                             </summary>
                             {result.plan.checklist.map((x) => (
                               <p key={x.id}>
@@ -890,7 +905,7 @@ export default function App() {
                                   can extract its visible details.{" "}
                                   <button
                                     className="inline-link"
-                                    onClick={() => setPage("privacy")}
+                                    onClick={event => showInfo(event, "privacy")}
                                   >
                                     How data is handled
                                   </button>
@@ -1076,10 +1091,8 @@ export default function App() {
                                   {select("supplierRegime", [
                                     ["unknown", "Not sure"],
                                     ["ordinary", "Ordinary registration"],
-                                    [
-                                      "simplified",
-                                      "OVR / simplified / special",
-                                    ],
+                                    ...(facts.country === "SG" ? [["ovr", "Overseas Vendor Registration (OVR)"]] : []),
+                                    ["simplified", "Other simplified / special regime"],
                                   ])}
                                 </Field>
                                 <Field label="Has this invoice been paid?">
@@ -1174,6 +1187,7 @@ export default function App() {
                 {result&&<FeedbackPanel key={`feedback-${sessionVersion}`} mode={facts.mode} country={facts.country}/>}
               </>
             )}
+            </div>
           </>
         )}
         {config && error && (

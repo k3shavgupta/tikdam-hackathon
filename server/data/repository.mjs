@@ -346,23 +346,25 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
             ? "ALREADY_PROCESSED"
             : "IDEMPOTENCY_CONFLICT",
       };
+    const reason = await getBudgetBlockReason(v.ceilingMicrousd,v.utcDay);
+    return { admitted: false, reservationId: null, reason: reason || "BUDGET_EXHAUSTED" };
+  }
+  async function getBudgetBlockReason(ceilingMicrousd, utcDay) {
     const settings = await getSettings();
     if (!settings.aiEnabled)
-      return { admitted: false, reservationId: null, reason: "AI_PAUSED" };
+      return "AI_PAUSED";
     const totals = await first(
       `SELECT COALESCE(SUM(${committed}),0) total,COALESCE(SUM(CASE WHEN utc_day=? THEN ${committed} ELSE 0 END),0) daily,SUM(CASE WHEN utc_day=? THEN 1 ELSE 0 END) calls,SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) running FROM ai_reservations`,
-      [v.utcDay, v.utcDay],
+      [utcDay, utcDay],
     );
-    const reason =
-      totals.total + v.ceilingMicrousd > settings.campaignCapMicrousd
+    return totals.total + ceilingMicrousd > settings.campaignCapMicrousd
         ? "BUDGET_EXHAUSTED"
-        : totals.daily + v.ceilingMicrousd > settings.dailyCapMicrousd ||
+        : totals.daily + ceilingMicrousd > settings.dailyCapMicrousd ||
             totals.calls >= settings.dailyCallCap
           ? "DAILY_LIMIT"
           : totals.running >= settings.maxInFlight
             ? "IN_FLIGHT"
-            : "BUDGET_EXHAUSTED";
-    return { admitted: false, reservationId: null, reason };
+            : null;
   }
   async function settleAiCall(input) {
     const v = z
@@ -600,6 +602,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
     consumeThrottle,
     getSettings,
     updateSettings,
+    getBudgetBlockReason,
     reserveAiCall,
     settleAiCall,
     getOverview,

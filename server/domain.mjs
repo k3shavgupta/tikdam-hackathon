@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { countries, reviewedCountries, clientSources, indiaCheckDefinitions } from "./catalog.mjs";
+import { countries, reviewedCountries, clientSources, indiaCheckDefinitions, routeVersion } from "./catalog.mjs";
 const reviewedCodes = new Set(reviewedCountries.map(country => country.code));
 export function normalizeCountry(value) {
   const v = String(value || "")
@@ -89,13 +89,25 @@ export function planPurchase(f) {
 export function assess(f) {
   const c = countryFor(f);
   if (!c) throw new Error("Choose a supported jurisdiction.");
-  const plan = planPurchase(f),
-    issues = [];
+  const plan = f.mode === "client" ? {
+    country: c.code,
+    countryName: c.name,
+    guaranteedRefund: false,
+    readiness: reviewedCodes.has(c.code) ? "guidance" : "unreviewed",
+    route: { type: "payment_reconciliation", text: "Compare the amount you invoiced with what the client paid. Obtain evidence for any tax or other deduction." },
+    checklist: [
+      { id: "invoice", title: "Keep the invoice you issued", text: "Record the gross amount, currency and invoice reference." },
+      { id: "payment", title: "Match the payment", text: "Keep the payment advice and compare amounts in the same currency." },
+      { id: "deduction", title: "Identify deductions", text: "Ask the payer to distinguish withholding from fees, exchange differences and unpaid amounts, and provide the relevant evidence." },
+    ],
+    sources: [clientSources[c.code]].filter(Boolean),
+  } : planPurchase(f);
+  const issues = [];
   const add = (code, text) => issues.push({ code, text });
   const result = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    ruleVersion: reviewedCodes.has(c.code) ? `tikdam-${c.code.toLowerCase()}-2026-11-01.2` : 'tikdam-generic-2026-11-02.1',
+    ruleVersion: routeVersion(c.code),
     verification: "user_assertions_only",
     country: c.code,
     status: "review_required",
@@ -121,7 +133,6 @@ export function assess(f) {
       label: "Withholding credit / refund review",
     };
     result.title = "Check what was deducted before claiming";
-    result.sources = [clientSources[c.code]].filter(Boolean);
     if (!reviewedCodes.has(c.code)) add('coverage', 'Local withholding, credit, and refund rules have not been reviewed for this location. This is an evidence request only.');
     result.clientRequest = `Please provide the payment breakdown and withholding/deduction certificate for invoice ${f.invoiceNumber || "[invoice number]"}, issued by ${f.legalName || "[legal issuer name]"}.\n\nPlease identify the gross invoice amount, amount paid, any tax withheld, tax jurisdiction, deduction date and the taxpayer credited. Please distinguish tax from platform/bank fees, FX, retention and unpaid balances, and provide the relevant certificate or remittance reference.\n\nThis is an evidence request, not a confirmation that a refund is due.`;
     try {
@@ -262,7 +273,7 @@ export function assess(f) {
       g = new Decimal(f.gross),
       use = new Decimal(f.businessUse);
     if (
-      n.lt(0) ||
+      n.lte(0) ||
       t.lte(0) ||
       g.lte(0) ||
       use.lt(0) ||
@@ -270,7 +281,7 @@ export function assess(f) {
       [n, t, g].some((x) => !x.isFinite())
     )
       throw Error();
-    if (n.plus(t).minus(g).abs().gt("0.01"))
+    if (!n.plus(t).equals(g))
       add(
         "invoice_total",
         "Net plus tax does not match the invoice total. Correct the extracted values or ask the supplier.",
@@ -287,9 +298,10 @@ export function assess(f) {
       "cross_border",
       "Foreign-business claims require a separate registration, establishment, reciprocity and filing review.",
     );
-  if (c.code === "SG" && f.supplierRegime === "simplified") {
+  if (c.code === "SG" && f.supplierRegime === "ovr" && f.registration === "standard" &&
+      plan.route.type === "domestic" && f.invoiceConfirmed && Number(f.tax) > 0) {
     result.benefit.type = "supplier_correction";
-    result.benefit.label = "Supplier correction";
+    result.benefit.label = "Possible supplier correction";
     result.title = "Ask the supplier about the GST charge";
     add(
       "supplier_correction",
@@ -352,7 +364,7 @@ export function assess(f) {
   result.nextSteps =
     result.benefit.type === "supplier_correction"
       ? [
-          "Ask the overseas vendor to check the charge and issue the appropriate correction.",
+          "If this was a remote service or imported low-value good, give the vendor your GST registration details and ask them to review the charge.",
           "Keep the original invoice and any credit note together.",
         ]
       : [
