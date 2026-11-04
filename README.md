@@ -8,7 +8,7 @@ Tikdam helps freelancers and small businesses prepare before buying, review purc
 - Owner dashboard: https://tikdam.xyz/admin, protected by Cloudflare Access.
 - Production uses Meta Model API for optional text chat. Check /api/config for current availability. Invoice extraction is paused. Guests can use the manual checker.
 
-The checker opens directly on chat. Choose the task and both locations above the message box; changing them starts a new conversation. Sending still requires consent and verification.
+The checker opens directly on chat. Choose a task; the location summary opens when you need to edit either country. Changing a task or location starts a new conversation. Sending still requires consent and verification. The manual review route is below the conversation.
 
 ## Run and verify
 
@@ -26,7 +26,7 @@ The legacy Node development app binds to http://127.0.0.1:4174. Its paid extract
 
 Tests include real local Workers/D1 execution, tax guards, concurrent budget admissions, billing uncertainty, idempotency, JWT denial, privacy canaries, strict API validation, React interactions, and session reset races. Ordinary tests mock Meta and Turnstile. Build/test success does not establish live OCR accuracy or legal entitlement.
 
-See `docs/BUILD-STATUS.md` for the build record and `docs/DEPLOYMENT.md` for deployment limits.
+See `docs/BUILD-STATUS.md` for the build record and `docs/DEPLOYMENT.md` for deployment limits. `DEMO.md` is a recording plan, and `SUBMISSION.md` contains copy for the actual hackathon form; neither is a completed submission.
 
 ## What V1 does
 

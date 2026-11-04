@@ -29,14 +29,16 @@ try {
     await page.locator('a[href="/app"]:visible').first().click();
     await page.locator('.chat-context').waitFor();
     await page.getByLabel('What would you like help with?').selectOption('purchase');
+    assert.equal(await page.locator('.chat-location').evaluate(node=>node.open),false);
+    await page.locator('.chat-location summary').click();
     await page.getByLabel('Purchase country').selectOption('FR');
     await page.getByLabel('Business country').selectOption('GB');
-    assert.match(await page.locator('.conversation-receipt').innerText(),/France/);
-    assert.match(await page.locator('.conversation-receipt').innerText(),/United Kingdom/);
+    assert.match(await page.locator('.chat-location summary').innerText(),/France/);
+    assert.match(await page.locator('.chat-location summary').innerText(),/United Kingdom/);
     await page.getByRole('button',{name:'Coverage & sources'}).click();
     await page.getByRole('button',{name:'Back to my check'}).click();
     assert.equal(await page.getByLabel('Purchase country').inputValue(),'FR');
-    const draft = page.getByRole('textbox',{name:'Your question'});
+    const draft = page.getByRole('textbox',{name:'Your message'});
     if (await draft.count()) {
       await draft.fill('Which invoice details should I ask for?');
       await page.getByRole('button',{name:'Your data'}).click();

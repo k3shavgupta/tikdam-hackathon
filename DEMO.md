@@ -1,12 +1,21 @@
-# Three-minute demo
+# Three-minute demo recording plan
 
-This is a recording plan, not a completed video or submission. Use fictional documents and disclose them.
+This is a script for a real recording, not a completed video. Use fictional facts. Do not present the preset example as OCR or imply a claim was filed. The public chat uses Meta Model API; invoice AI extraction is paused.
 
-- 0:00–0:25: show the three tasks and explain the distinction between input credit, cash refunds and payment withholding.
-- 0:25–0:55: prepare a purchase with the actual legal buyer, jurisdiction and registration. Generate the source-linked checklist and copy the seller request.
-- 0:55–1:40: upload a fictional invoice, consent, and demonstrate a real successful Muse extraction only after live integration is verified. Review uncertainty, edit facts and confirm. If AI is paused or fails, show manual entry and state that clearly. The preset example is not OCR.
-- 1:40–2:10: show a supported narrow UK/Singapore input-credit example. Change the buyer or remove confirmation to block the amount. India stationery requires the eight separate preparer assertions; do not present them as government checks.
-- 2:10–2:35: review a client payment, show the gap and request the certificate. Explain why withholding and refund entitlement remain separate.
-- 2:35–3:00: show the private dashboard only after actual owner login works. Highlight estimated usage, reserved allowance and pause switch. Close with source/coverage limits and identify the work built during the event.
+## Prepare before recording
 
-The selector covers 250 countries and territories; local guidance is researched for 11, and numerical routes remain narrow IN/GB/SG conditional candidates. The current transaction window ends 1 November 2026. No claim has been filed by Tikdam. Model calls, admin login, browser/device checks and deployment each need their own evidence in the runbook.
+- Open https://tikdam.xyz/app in a fresh browser tab and check `/api/config` reports chat available. Keep private account screens and any real invoices out of the recording.
+- Have the public repository and official source link ready. Use the shared chat allowance sparingly; a failed/paused chat is a legitimate manual fallback.
+- Use the in-app synthetic UK example for the bill review. It is labeled as an example, not a real uploaded invoice.
+- Record the browser at readable zoom. Keep the video at or under three minutes. Upload it and check that its link opens without your account.
+
+## Shot list
+
+- **0:00–0:20 — Problem.** “Small businesses often know something is wrong with a bill or payment, but not which fact to check first. Tikdam helps prepare the evidence and next action.” Show the homepage and open the checker.
+- **0:20–1:05 — Conversation.** Show the task selector and compact location control. Ask one fictional question about buying office stationery for an Indian business. Show consent and verification before sending. Read the actual reply; if it asks for missing facts, explain that this is the intended intake step. Do not claim a model result that the screen does not show.
+- **1:05–1:35 — Reviewable result.** Show any suggested fields; apply only after review. Select “Build my buying checklist,” then show the seller request, checklist and official sources. Explain that source links and rules are server-owned.
+- **1:35–2:15 — Invoice check.** Choose “Review a bill,” open “Review details,” load the clearly labeled synthetic example, and run the check before confirming the invoice. Show that the amount is withheld. Confirm the reviewed details, run again and show the conditional UK candidate amount with its conditions. It is not a promised refund.
+- **2:15–2:40 — Client payment.** Choose “Check a client payment,” load the synthetic example, and show the payment gap and certificate request. Explain that the gap alone does not prove tax withholding.
+- **2:40–3:00 — Scope and build.** Show the source/coverage boundary and the public repository. Say that text chat uses Meta Model API, while invoice extraction and filing are not active. End on the live app URL.
+
+If chat is paused during recording, show the pause message and continue through the manual review path. Say explicitly that the video does not demonstrate a successful live model answer.

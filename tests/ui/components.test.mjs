@@ -214,17 +214,18 @@ test('dashboard does not invent evaluation traffic before a snapshot is imported
 
 test('Baseten processing consent identifies the actual selected provider',()=>{
  const html=renderToStaticMarkup(React.createElement(components.AssistantPanel,{facts:{mode:'before',country:'IN'},config:{provider:'Baseten',ai:{chatAvailable:true},countries:[{code:'IN',sources:[]}]}}));
- assert.match(html,/Muse Spark Open · Baseten/);assert.match(html,/case details to Baseten/);assert.doesNotMatch(html,/details to Meta for processing/);
+ assert.match(html,/Send my messages and case details to Baseten/);assert.match(html,/case details to Baseten/);assert.doesNotMatch(html,/details to Meta for processing/);
 });
 
-test('conversation starter fills a draft without sending or granting consent',async()=>{
+test('single example stays in the placeholder without sending or granting consent',async()=>{
  const requests=[];
  const view=await mount(components.AssistantPanel,{conversational:true,facts:{mode:'client',country:'IN'},config:{provider:'Baseten',ai:{chatAvailable:true},countries:[{code:'IN',sources:[]}]}},async(path)=>{requests.push(path);return Response.json({ok:true});});
  try{
   const d=view.dom.window.document;
   assert.match(d.querySelector('[role="log"]').textContent,/What work did you do/);
-  await act(async()=>d.querySelector('.chat-starters button').click());
-  assert.equal(d.querySelector('textarea').value,'My client paid less than the invoice.');
+  assert.equal(d.querySelector('.chat-starters'),null);
+  assert.match(d.querySelector('textarea').placeholder,/My client paid less than the invoice/);
+  assert.equal(d.querySelector('textarea').value,'');
   assert.equal(d.querySelector('.tk-check input').checked,false);
   assert.equal([...d.querySelectorAll('button')].find(x=>x.textContent==='Send question').disabled,true);
   assert.equal(requests.length,0);

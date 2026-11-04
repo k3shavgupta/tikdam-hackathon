@@ -26,7 +26,7 @@ async function mountApp(fn,{guided=false,assistant=false}={}){
   return Response.json({ok:true});
  };
  const root=createRoot(document.getElementById('root'));
- try{await act(async()=>{root.render(React.createElement(App));});if(!guided){await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='Review details').click();});}await fn(dom.window.document,async(text)=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes(text));assert.ok(b,`Button ${text} exists`);await act(async()=>b.click());});}
+ try{await act(async()=>{root.render(React.createElement(App));});if(!guided){await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='Review details').click();});}await fn(dom.window.document,async(text)=>{const mode={'Review a bill':'purchase','Check a client payment':'client'}[text];if(mode){const task=document.querySelector('[aria-label="What would you like help with?"]');await act(async()=>{task.value=mode;task.dispatchEvent(new window.Event('change',{bubbles:true}));});return;}const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes(text));assert.ok(b,`Button ${text} exists`);await act(async()=>b.click());});}
  finally{await act(async()=>root.unmount());dom.window.close();for(const [k,v]of Object.entries(previous))v?Object.defineProperty(globalThis,k,v):delete globalThis[k];}
 }
 
@@ -43,7 +43,7 @@ test('checker uses shared brand and keeps worldwide scope in the purchase flow',
  assert.equal(document.querySelector('.brand').getAttribute('href'),'/');
  assert.match(document.querySelector('.app-scope').textContent,/250 locations/);
  await click('Review a bill');
- assert.equal(document.querySelector('.change-task button[aria-pressed="true"]').textContent,'Review a bill');
+ assert.equal(document.querySelector('[aria-label="What would you like help with?"]').selectedOptions[0].textContent,'Review a bill');
  assert.match(document.querySelector('.workspace').textContent,/India stationery checks/);
 }));
 
@@ -91,8 +91,10 @@ test('chat is available immediately and location choices update the check',()=>m
  assert.equal(business.value,'IN');
  await act(async()=>{business.value='GB';business.dispatchEvent(new window.Event('change',{bubbles:true}));});
  assert.ok(document.querySelector('.conversation-primary'));
- assert.match(document.querySelector('.conversation-receipt').textContent,/France/);
- assert.match(document.querySelector('.conversation-receipt').textContent,/United Kingdom/);
+ assert.equal(document.querySelector('.chat-location').open,false);
+ assert.equal(document.querySelector('.conversation-receipt'),null);
+ assert.match(document.querySelector('.chat-location summary').textContent,/France/);
+ assert.match(document.querySelector('.chat-location summary').textContent,/United Kingdom/);
  assert.equal(document.querySelector('.workspace').hidden,true);
  assert.equal(document.querySelector('.result-main'),null);
  await click('Review details');
@@ -107,8 +109,8 @@ test('task and country choices update the opening prompt without a setup screen'
  await act(async()=>{task.value='client';task.dispatchEvent(new window.Event('change',{bubbles:true}));});
  const select=document.querySelector('[aria-label="Payment country"]');
  await act(async()=>{select.value='SG';select.dispatchEvent(new window.Event('change',{bubbles:true}));});
- const text=document.querySelector('.conversation-receipt').textContent;
- assert.match(text,/Check a client payment/);assert.equal((text.match(/Singapore/g)||[]).length,1);
+ const text=document.querySelector('.chat-location summary').textContent;
+ assert.match(text,/Singapore payment/);assert.equal((text.match(/Singapore/g)||[]).length,1);
  assert.match(document.querySelector('.tk-opening').textContent,/What work did you do/);
  assert.equal(document.querySelector('.workspace').hidden,true);
 },{guided:true,assistant:true}));
@@ -119,17 +121,14 @@ test('unreviewed location warning appears beside the first message',()=>mountApp
  assert.match(document.querySelector('.tk-notice').textContent,/Local tax rules have not been reviewed/);
 },{guided:true,assistant:true}));
 
-test('applying a country suggestion updates the receipt and invoice currency together',()=>mountApp(async(document,click)=>{
+test('chat keeps one message action and a clear manual review route',()=>mountApp(async(document,click)=>{
  const task=document.querySelector('[aria-label="What would you like help with?"]');
  await act(async()=>{task.value='purchase';task.dispatchEvent(new window.Event('change',{bubbles:true}));});
- await act(async()=>document.querySelector('.chat-starters button').click());
- await act(async()=>document.querySelector('.tk-check input').click());
- await click('Send question');
- assert.match(document.querySelector('.conversation-receipt').textContent,/Purchase inIndia/);
- await click('Apply suggested fields');
- const receipt=document.querySelector('.conversation-receipt');
- assert.match(receipt.textContent,/Purchase inUnited KingdomBusiness based inIndia/);
+ assert.equal(document.querySelector('.chat-starters'),null);
+ assert.equal(document.querySelector('.conversation-receipt'),null);
+ assert.match(document.querySelector('#tk-question').placeholder,/I bought a laptop for work/);
+ assert.equal(document.querySelectorAll('.tk-actions button').length,1);
+ assert.equal(document.querySelector('.chat-location').open,false);
  await click('Review details');
- const currency=[...document.querySelectorAll('label.field')].find(label=>label.textContent.includes('Currency'));
- assert.equal(currency.querySelector('input,select').value,'GBP');
+ assert.equal(document.querySelector('.workspace').hidden,false);
 },{guided:true,assistant:true}));

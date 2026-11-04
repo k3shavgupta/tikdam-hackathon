@@ -580,39 +580,19 @@ export default function App() {
                     </p>
                     {!result && <p className="app-scope">Choose from {config.countries.length} locations. Local tax guidance is reviewed for 11; numerical checks cover narrow India, UK and Singapore cases.</p>}
                   </div>
-                  <div className="model-status">
-                    <span
-                      className={
-                        config.ai?.chatAvailable || config.modelConfigured ? "connected-dot" : "offline-dot"
-                      }
-                    />
-                    <div>
-                      {config.ai?.chatAvailable ? "Ask Tikdam available" : config.modelConfigured ? "Muse Spark available" : "Manual checks available"}
-                      <small>{config.ai?.chatAvailable && !config.modelConfigured ? "Chat is available. AI bill reading is paused; enter invoice details manually." : config.modelConfigured ? "Documents sent only with your permission" : config.ai?.reason || "AI is paused; manual checks and examples work now"}</small>
-                    </div>
-                  </div>
                 </div>
                 <div className="chat-layout">
                   <AssistantPanel key={sessionVersion} facts={facts} result={result} config={config} onPropose={applyProposals} conversational onReview={reviewDetails} context={<div className="chat-context">
                     <label><span>I want to</span><select aria-label="What would you like help with?" value={facts.mode} onChange={event=>selectMode(event.target.value)}>{modes.map(([id,title])=><option key={id} value={id}>{title}</option>)}</select></label>
-                    <label><span>{facts.mode==='client'?'Payment from':'Purchase in'}</span><select aria-label={facts.mode==='client'?'Payment country':'Purchase country'} value={facts.country} onChange={event=>edit('country',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
-                    <label><span>Business based in</span><select aria-label="Business country" value={facts.businessCountry} onChange={event=>edit('businessCountry',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
-                    <small>Changes start a new conversation.</small>
+                    <details className="chat-location"><summary><span>Location</span><strong>{country?.name} {facts.mode==='client'?'payment':'purchase'} · {config.countries.find(c=>c.code===facts.businessCountry)?.name} business</strong><span className="chat-edit-location">Edit</span></summary>
+                      <div className="chat-location-fields">
+                        <label><span>{facts.mode==='client'?'Payment from':'Purchase in'}</span><select aria-label={facts.mode==='client'?'Payment country':'Purchase country'} value={facts.country} onChange={event=>edit('country',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+                        <label><span>Business based in</span><select aria-label="Business country" value={facts.businessCountry} onChange={event=>edit('businessCountry',event.target.value)}>{config.countries.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+                        <small>Changing a location starts a new conversation.</small>
+                      </div>
+                    </details>
                   </div>}/>
-                  <aside className="conversation-receipt" aria-labelledby="check-details-title">
-                    <div className="receipt-heading"><img src="/brand/icon.svg" alt=""/><h2 id="check-details-title">Your check so far</h2></div>
-                    <dl>
-                      <div><dt>Task</dt><dd>{modes.find(m=>m[0]===facts.mode)?.[1]}</dd></div>
-                      <div><dt>{facts.mode==='client'?'Payment from':'Purchase in'}</dt><dd>{country?.name}</dd></div>
-                      <div><dt>Business based in</dt><dd>{config.countries.find(c=>c.code===facts.businessCountry)?.name}</dd></div>
-                      <div><dt>{facts.mode==='client'?'Work or service':'Purchase'}</dt><dd>{facts.item||'Tell us in the chat'}</dd></div>
-                    </dl>
-                    <p>Chat suggestions are added only when you apply them. Review the details before checking an amount.</p>
-                    <button className="secondary" onClick={reviewDetails} aria-expanded={detailsOpen} aria-controls="review-details">Review details</button>
-                    {facts.mode==='before'&&<button className="primary" onClick={run} disabled={Boolean(busy)}>{busy?'Checking…':'Build my buying checklist'}</button>}
-                    <details className="change-task"><summary>Change task</summary>{modes.map(([id,title])=><button key={id} aria-pressed={facts.mode===id} onClick={()=>selectMode(id)}>{title}</button>)}</details>
-                    <small>Rules determine supported amounts. No automatic filings.</small>
-                  </aside>
+                  <div className="chat-next-step"><span>Ready to check the details?</span><button className="secondary" onClick={reviewDetails} aria-expanded={detailsOpen} aria-controls="review-details">Review details</button>{facts.mode==='before'&&<button className="primary" onClick={run} disabled={Boolean(busy)}>{busy?'Checking…':'Build my buying checklist'}</button>}</div>
                 </div>
                 {result ? (
                   <div className="result-layout">
