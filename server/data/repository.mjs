@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {countryCodeSchema} from '../schema.mjs';
 import {chatTopics} from '../ai/topics.mjs';
+import {verifiedPricing, verifiedBasetenPricing} from '../ai/pricing.mjs';
 
 const countries = countryCodeSchema;
 const modes = z.enum(["before", "purchase", "client"]);
@@ -468,6 +469,49 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
       byChatTopic,
     };
   }
+  async function listAiCosts(input = {}) {
+    const v = z.object({
+      from: isoInput.optional(),
+      to: isoInput.optional(),
+      limit: integer.min(1).max(100).default(25),
+      offset: integer.max(100000).default(0),
+    }).strict().parse(input);
+    const [from, to] = bounds(v);
+    const summary = await first(
+      `SELECT COUNT(*) AS queries,
+        COUNT(CASE WHEN status='succeeded' THEN 1 END) AS estimatedQueries,
+        COALESCE(SUM(CASE WHEN status='succeeded' THEN estimated_microusd ELSE 0 END),0) AS estimatedMicrousd,
+        AVG(CASE WHEN status='succeeded' THEN estimated_microusd END) AS averageMicrousd,
+        MIN(CASE WHEN status='succeeded' THEN estimated_microusd END) AS minMicrousd,
+        MAX(CASE WHEN status='succeeded' THEN estimated_microusd END) AS maxMicrousd,
+        COALESCE(SUM(CASE WHEN status IN ('running','billing_unknown') THEN ceiling_microusd ELSE 0 END),0) AS heldMicrousd,
+        COUNT(CASE WHEN status='billing_unknown' THEN 1 END) AS billingUnknown,
+        COUNT(CASE WHEN status='failed_before_send' THEN 1 END) AS failedBeforeSend
+        FROM ai_reservations WHERE created_at BETWEEN ? AND ?`,
+      [from, to],
+    );
+    const rows = await all(
+      `SELECT r.id,r.operation,r.model,r.pricing_version AS pricingVersion,
+        r.created_at AS createdAt,r.status AS billingStatus,
+        CASE WHEN r.status='succeeded' THEN r.estimated_microusd WHEN r.status='failed_before_send' THEN 0 END AS estimatedMicrousd,
+        CASE WHEN r.status='succeeded' THEN r.input_tokens END AS inputTokens,
+        CASE WHEN r.status='succeeded' THEN r.output_tokens END AS outputTokens,
+        CASE WHEN r.status IN ('running','billing_unknown') THEN r.ceiling_microusd END AS heldMicrousd,
+        j.status AS responseStatus,j.error_code AS errorCode
+        FROM ai_reservations r LEFT JOIN jobs j ON j.id=r.id
+        WHERE r.created_at BETWEEN ? AND ? ORDER BY r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`,
+      [from, to, v.limit, v.offset],
+    );
+    const items = rows.map(row => {
+      const pricing = [verifiedPricing, verifiedBasetenPricing].find(price => price.version === row.pricingVersion && price.model === row.model);
+      return {
+        ...row,
+        provider: row.model === verifiedPricing.model ? 'Meta' : row.model === verifiedBasetenPricing.model ? 'Baseten' : 'Unknown provider',
+        rates: pricing ? {inputUsdPerMillion: pricing.inputUsdPerMillion, outputUsdPerMillion: pricing.outputUsdPerMillion} : null,
+      };
+    });
+    return {items, total: summary.queries, summary, from, to};
+  }
   async function listJobs(input = {}) {
     const v = z
       .object({
@@ -606,6 +650,7 @@ export function createRepository(db, { clock = () => Date.now() } = {}) {
     reserveAiCall,
     settleAiCall,
     getOverview,
+    listAiCosts,
     listJobs,
     addFeedback,
     listFeedback,

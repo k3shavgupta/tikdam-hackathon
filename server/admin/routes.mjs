@@ -54,6 +54,7 @@ export async function handleAdminRequest(
     "evaluation",
     "overview",
     "jobs",
+    "costs",
     "coverage",
     "feedback",
     "settings",
@@ -69,6 +70,7 @@ export async function handleAdminRequest(
           await repository.getOverview({ from: params.from, to: params.to }),
         );
       if (route === "jobs") return json(await repository.listJobs(params));
+      if (route === "costs") return json(await repository.listAiCosts(params));
       if (route === "coverage") return json({ items: coverage ?? [] });
       if (route === "feedback")
         return json(

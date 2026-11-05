@@ -8,6 +8,7 @@ const options = {
   repository: {
     getOverview: async () => ({ usage: { spentMicrousd: 0 } }),
     listJobs: async (args) => ({ items: [], total: 0, args }),
+    listAiCosts: async (args) => ({ items: [], total: 0, args }),
     listFeedback: async () => ({ items: [], total: 0 }),
     updateSettings: async (x) => x,
     purge: async (x) => x,
@@ -54,6 +55,15 @@ test("admin routes return metadata and bounded pagination only after verified id
     await (await handleAdminRequest(req("coverage"), options)).json(),
     { items: options.coverage },
   );
+});
+
+test('query costs require verified identity and accept bounded date pagination', async () => {
+  const denied = await handleAdminRequest(req('costs'), {...options, admin:null});
+  assert.equal(denied.status,403);
+  const response = await handleAdminRequest(req('costs?from=2026-11-01&to=2026-11-05&limit=10&offset=25'),options);
+  assert.equal(response.status,200);
+  assert.deepEqual((await response.json()).args,{from:'2026-11-01',to:'2026-11-05',limit:10,offset:25});
+  assert.equal((await handleAdminRequest(req('costs?limit=101'),options)).status,400);
 });
 test("mutations reject foreign or missing origins, invalid fields, and non-JSON bodies", async () => {
   assert.equal(

@@ -83,6 +83,38 @@ test('owner dashboard shows fixed chat topics and per-query micro-dollar estimat
 });
 
 const emptyOverview={settings:{aiEnabled:false,campaignCapMicrousd:5000000,dailyCapMicrousd:1000000,dailyCallCap:10,maxInFlight:1},usage:{spentMicrousd:0,reservedMicrousd:0,remainingMicrousd:5000000,inputTokens:0,outputTokens:0,billingUnknown:0},totals:{started:0,completed:0,failed:0},byCountry:[],byMode:[]};
+
+test('query cost view separates paid failed replies from unknown billing and applies only date filters',async()=>{
+ const requests=[];
+ const shared={operation:'chat',provider:'Meta',model:'muse-spark-1.3',createdAt:'2026-11-04T14:21:03.570Z',pricingVersion:'meta-standard-2026-11-01.1',rates:{inputUsdPerMillion:1.25,outputUsdPerMillion:4.25}};
+ const report={items:[
+  {...shared,id:'recorded-query',billingStatus:'succeeded',responseStatus:'failed',errorCode:'MODEL_OUTPUT_INVALID',inputTokens:693,outputTokens:582,estimatedMicrousd:3340,heldMicrousd:null},
+  {...shared,id:'unknown-query',billingStatus:'billing_unknown',responseStatus:null,inputTokens:null,outputTokens:null,estimatedMicrousd:null,heldMicrousd:30100},
+ ],total:2,summary:{queries:2,estimatedQueries:1,estimatedMicrousd:3340,averageMicrousd:3340,minMicrousd:3340,maxMicrousd:3340,heldMicrousd:30100,billingUnknown:1,failedBeforeSend:0}};
+ const view=await mount(components.AdminApp,{},async path=>{
+  requests.push(path);
+  return Response.json(path.includes('/overview')?emptyOverview:path.includes('/costs')?report:{items:[],total:0});
+ });
+ try{
+  const d=view.dom.window.document;
+  const panel=d.querySelector('[aria-labelledby="tk-costs-title"]');
+  const rows=panel.querySelectorAll('tbody tr');
+  assert.match(rows[0].textContent,/\$0\.003340/);
+  assert.match(rows[0].textContent,/Response failed/);
+  assert.match(rows[0].textContent,/Input \$1\.25 \/ 1M/);
+  assert.match(rows[1].textContent,/Cost unknown/);
+  assert.match(rows[1].textContent,/\$0\.030100 held/);
+  assert.doesNotMatch(rows[1].textContent,/\$0\.000000|0 \/ 0/);
+  const form=d.querySelector('.tk-filters');
+  const dates=form.querySelectorAll('input[type="date"]');
+  await change(view,dates[0],'2026-11-01');
+  await change(view,dates[1],'2026-11-05');
+  await submit(view,form);
+  const costRequest=requests.filter(path=>path.includes('/costs')).at(-1);
+  assert.match(costRequest,/from=2026-11-01&to=2026-11-05/);
+  assert.doesNotMatch(costRequest,/country=|status=|operation=/);
+ }finally{await view.cleanup();}
+});
 async function change(view,element,value){
  await act(async()=>{
   const prototype=element.tagName==='SELECT'?view.dom.window.HTMLSelectElement.prototype:element.tagName==='TEXTAREA'?view.dom.window.HTMLTextAreaElement.prototype:view.dom.window.HTMLInputElement.prototype;

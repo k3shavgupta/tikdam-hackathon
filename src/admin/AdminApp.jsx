@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {api} from '../api.mjs';
+import {QueryCosts} from './QueryCosts.jsx';
 import '../admin.css';
 
 const usd = value => Number.isSafeInteger(value) ? new Intl.NumberFormat('en-US', {style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(value/1000000) : 'Unavailable';
@@ -14,6 +15,7 @@ function query(filters, extra={}) {const params=new URLSearchParams(Object.entri
 export default function AdminApp(){
  const [overview,setOverview]=useState(null),[jobs,setJobs]=useState({items:[],total:0}),[coverage,setCoverage]=useState([]),[feedback,setFeedback]=useState({items:[],total:0});
  const [evaluation,setEvaluation]=useState(null),[evaluationError,setEvaluationError]=useState('');
+ const [costs,setCosts]=useState(null),[costOffset,setCostOffset]=useState(0);
  const [filters,setFilters]=useState(initialFilters),[applied,setApplied]=useState(initialFilters),[offset,setOffset]=useState(0),[feedbackOffset,setFeedbackOffset]=useState(0);
  const [busy,setBusy]=useState(true),[action,setAction]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[authError,setAuthError]=useState(false);
  const [limits,setLimits]=useState({campaign:'',daily:'',calls:''}),[purgeKind,setPurgeKind]=useState('events'),[confirmation,setConfirmation]=useState('');
@@ -21,18 +23,20 @@ export default function AdminApp(){
  const load=useCallback(async()=>{
   const version=++generation.current;setBusy(true);setError('');setAuthError(false);
   try{
-   const [summary,records,routes,messages,evaluationReport]=await Promise.all([
+   const [summary,records,routes,messages,evaluationReport,costReport]=await Promise.all([
     api('/api/admin/overview'+query({from:applied.from,to:applied.to})),
     api('/api/admin/jobs'+query(applied,{limit:25,offset})),
     api('/api/admin/coverage'),api('/api/admin/feedback'+query({},{limit:25,offset:feedbackOffset})),
     api('/api/admin/evaluation').catch(err=>{if(err.status===401||err.status===403)throw err;return{snapshot:null,error:'Evaluation reporting is unavailable. Production records remain separate.'};}),
+    api('/api/admin/costs'+query({from:applied.from,to:applied.to},{limit:25,offset:costOffset})).catch(err=>{if(err.status===401||err.status===403)throw err;return{error:'Query cost details could not load. Refresh records to try again.'};}),
    ]);
    if(version!==generation.current)return;
    setOverview(summary);setJobs(records);setCoverage(routes.items||[]);setFeedback(messages);setEvaluation(evaluationReport.snapshot||null);setEvaluationError(evaluationReport.error||'');
+   setCosts(costReport);
    setLimits({campaign:String(summary.settings.campaignCapMicrousd/1000000),daily:String(summary.settings.dailyCapMicrousd/1000000),calls:String(summary.settings.dailyCallCap)});
-  }catch(err){if(version===generation.current){setError(err.message);const denied=err.status===401||err.status===403||err.code==='INVALID_RESPONSE';setAuthError(denied);if(denied){setOverview(null);setJobs({items:[],total:0});setCoverage([]);setFeedback({items:[],total:0});setEvaluation(null);setEvaluationError('');}}}
+  }catch(err){if(version===generation.current){setError(err.message);const denied=err.status===401||err.status===403||err.code==='INVALID_RESPONSE';setAuthError(denied);if(denied){setOverview(null);setJobs({items:[],total:0});setCoverage([]);setFeedback({items:[],total:0});setEvaluation(null);setEvaluationError('');setCosts(null);}}}
   finally{if(version===generation.current)setBusy(false);}
- },[applied,offset,feedbackOffset]);
+ },[applied,offset,feedbackOffset,costOffset]);
  useEffect(()=>{load();return()=>{generation.current++;};},[load]);
  async function changeSettings(patch){
   if(action)return;setAction('settings');setError('');setNotice('');
@@ -79,7 +83,7 @@ export default function AdminApp(){
      </>}
     </section>
     <section className="tk-admin-section" aria-labelledby="tk-activity-title"><h2 id="tk-activity-title">Activity</h2><p className="tk-note">Starts are client-reported workflow interactions. Completed checks are successful server preparation or assessment operations. Counts include examples and repeated checks. These are not unique people, filed claims or refunds paid.</p>
-     <form className="tk-filters" onSubmit={event=>{event.preventDefault();setApplied({...filters});setOffset(0);setNotice('');}}>
+     <form className="tk-filters" onSubmit={event=>{event.preventDefault();setApplied({...filters});setOffset(0);setCostOffset(0);setNotice('');}}>
       <label>From UTC date<input type="date" value={filters.from} onChange={event=>setFilters({...filters,from:event.target.value})}/></label><label>Through UTC date<input type="date" value={filters.to} min={filters.from||undefined} onChange={event=>setFilters({...filters,to:event.target.value})}/></label>
       <label>Country<select value={filters.country} onChange={event=>setFilters({...filters,country:event.target.value})}><option value="">All countries</option>{coverage.map(route=><option key={route.code} value={route.code}>{route.name}</option>)}</select></label>
       <label>Status<select value={filters.status} onChange={event=>setFilters({...filters,status:event.target.value})}><option value="">All statuses</option>{['running','succeeded','failed','billing_unknown','blocked'].map(status=><option key={status} value={status}>{label(status)}</option>)}</select></label>
@@ -94,6 +98,7 @@ export default function AdminApp(){
      <h3>Processing jobs</h3>{jobs.items.length===0?<p className="tk-empty">No processing jobs match these filters.</p>:<div className="tk-table-wrap"><table><caption className="tk-visually-hidden">Processing jobs, newest first. All times UTC.</caption><thead><tr>{['Time','Topic / operation / country','Status','Model','Duration','Tokens in / out','Estimated cost','Request ID / error'].map(heading=><th key={heading} scope="col">{heading}</th>)}</tr></thead><tbody>{jobs.items.map(job=><tr key={job.id}><td>{time(job.createdAt)}{job.finishedAt&&<small>Finished {time(job.finishedAt)}</small>}</td><td>{job.operation==='chat'?topicLabel(job.topic||'unclassified'):label(job.operation)}<small>{label(job.operation)} · {label(job.country)} / {label(job.mode)}</small></td><td><span className={'tk-job-status tk-job-'+job.status}>{label(job.status)}</span></td><td>{job.model||'No model'}</td><td>{Number.isFinite(job.durationMs)?`${number(job.durationMs)} ms`:'—'}</td><td>{number(job.inputTokens||0)} / {number(job.outputTokens||0)}</td><td>{job.estimatedMicrousd!=null?queryUsd(job.estimatedMicrousd):job.heldMicrousd!=null?`Up to ${queryUsd(job.heldMicrousd)} held`:'No settled cost'}</td><td className="tk-request-id">{job.id}{job.errorCode&&<small>{job.errorCode}</small>}</td></tr>)}</tbody></table></div>}
      <div className="tk-pagination"><button type="button" className="tk-secondary" disabled={busy||offset===0} onClick={()=>setOffset(Math.max(0,offset-25))}>Previous jobs</button><span>{jobs.total?`${offset+1}–${Math.min(offset+25,jobs.total)} of ${number(jobs.total)}`:'0 jobs'}</span><button type="button" className="tk-secondary" disabled={busy||offset+25>=jobs.total} onClick={()=>setOffset(offset+25)}>Next jobs</button></div>
     </section>
+    <QueryCosts report={costs} offset={costOffset} onOffset={setCostOffset} busy={busy}/>
     <section className="tk-admin-section" aria-labelledby="tk-coverage-title"><h2 id="tk-coverage-title">Coverage and source checks</h2><p className="tk-note">A listed country does not imply a complete calculator. Tested means code scenarios passed, not government verification or professional approval.</p>{coverage.length===0?<p className="tk-empty">No coverage records are available.</p>:coverage.map(route=><details className="tk-route" key={route.code}><summary><strong>{route.name}</strong><span>{label(route.purchaseEstimate)} · {label(route.readiness)}</span></summary><p>{route.scope}</p><dl className="tk-route-facts"><div><dt>Route version</dt><dd>{route.routeVersion||'Unavailable'}</dd></div><div><dt>Source checked</dt><dd>{route.sourceChecked||'Unverified'}</dd></div><div><dt>Transaction window</dt><dd>{route.transactionWindow?`${route.transactionWindow.from} through ${route.transactionWindow.through}`:'No numerical route'}</dd></div><div><dt>Client-payment estimates</dt><dd>{label(route.clientEstimate)}</dd></div></dl><ul>{(route.sources||[]).map((source,index)=><li key={source.id||index}><a href={source.url} rel="noreferrer" target="_blank">{source.title}</a></li>)}</ul></details>)}</section>
     <section className="tk-admin-section" aria-labelledby="tk-feedback-title"><h2 id="tk-feedback-title">Submitted feedback</h2><p className="tk-note">Only explicit user submissions appear here. Feedback becomes eligible for daily cleanup after 90 days. Processing a backlog can take longer.</p>{feedback.items.length===0?<p className="tk-empty">No feedback has been submitted.</p>:<ol className="tk-feedback-list">{feedback.items.map(item=><li key={item.id}><p>{item.text}</p><small>{time(item.createdAt)} · {label(item.country)} · {label(item.mode)}</small></li>)}</ol>}<div className="tk-pagination"><button type="button" className="tk-secondary" disabled={busy||feedbackOffset===0} onClick={()=>setFeedbackOffset(Math.max(0,feedbackOffset-25))}>Previous feedback</button><span>{number(feedback.total)} submissions</span><button type="button" className="tk-secondary" disabled={busy||feedbackOffset+25>=feedback.total} onClick={()=>setFeedbackOffset(feedbackOffset+25)}>Next feedback</button></div></section>
     <section className="tk-admin-section" aria-labelledby="tk-limits-title"><h2 id="tk-limits-title">Lower processing limits</h2><p className="tk-note">These controls only reduce the current limits. A reduction cannot be undone here. Limits cannot fall below committed spending or calls. Raising the campaign ceiling requires a reviewed configuration change.</p><form className="tk-filters" onSubmit={saveLimits}><label>Campaign allowance in USD<input type="number" min="0" max={settings.campaignCapMicrousd/1000000} step="0.000001" value={limits.campaign} onChange={event=>setLimits({...limits,campaign:event.target.value})}/></label><label>UTC-day allowance in USD<input type="number" min="0" max={settings.dailyCapMicrousd/1000000} step="0.000001" value={limits.daily} onChange={event=>setLimits({...limits,daily:event.target.value})}/></label><label>Daily admitted calls<input type="number" min="1" max={settings.dailyCallCap} step="1" value={limits.calls} onChange={event=>setLimits({...limits,calls:event.target.value})}/></label><button className="tk-secondary" disabled={Boolean(action)||busy}>Save lower limits</button></form></section>

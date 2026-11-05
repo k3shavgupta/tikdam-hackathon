@@ -53,6 +53,47 @@ async function setup() {
 }
 const actor = "verified-owner";
 const tokenUsage = { inputTokens: 100, outputTokens: 20 };
+
+test('query costs retain ledger truth across failed replies, unknown billing and log cleanup', async () => {
+  const {repository:r,db,advance}=await setup();
+  await r.updateSettings({actor,patch:{aiEnabled:true}});
+  const requests=[];
+  for (const [status,cost] of [['succeeded',1001],['succeeded',2002],['billing_unknown',null],['failed_before_send',null]]) {
+    const request=call({model:'muse-spark-1.3',pricingVersion:'meta-standard-2026-11-01.1',ceilingMicrousd:30100});
+    requests.push(request);
+    await r.reserveAiCall(request);
+    await r.recordJob({id:request.requestId,operation:'chat',status:'running',model:request.model});
+    await r.settleAiCall({reservationId:request.requestId,status,...(cost===null?{}:{tokens:tokenUsage,estimatedMicrousd:cost})});
+    if(cost!==null)await r.finishJob({id:request.requestId,status:'failed',errorCode:'MODEL_OUTPUT_INVALID',tokens:tokenUsage,estimatedMicrousd:cost});
+    advance(1000);
+  }
+  const report=await r.listAiCosts({limit:2});
+  assert.equal(report.total,4);
+  assert.equal(report.items.length,2);
+  assert.deepEqual(report.summary,{queries:4,estimatedQueries:2,estimatedMicrousd:3003,averageMicrousd:1501.5,minMicrousd:1001,maxMicrousd:2002,heldMicrousd:30100,billingUnknown:1,failedBeforeSend:1});
+  assert.equal(report.items[0].billingStatus,'failed_before_send');
+  assert.equal(report.items[0].estimatedMicrousd,0);
+  assert.equal(report.items[1].estimatedMicrousd,null);
+  assert.equal(report.items[1].inputTokens,null);
+  assert.equal(report.items[1].heldMicrousd,30100);
+  const recorded=(await r.listAiCosts({limit:2,offset:2})).items;
+  assert.equal(recorded[0].responseStatus,'failed');
+  assert.equal(recorded[0].estimatedMicrousd,2002);
+  assert.deepEqual(recorded[0].rates,{inputUsdPerMillion:1.25,outputUsdPerMillion:4.25});
+  assert.equal(recorded[0].provider,'Meta');
+  await db.prepare('DELETE FROM jobs').run();
+  const retained=await r.listAiCosts();
+  assert.deepEqual(retained.summary,report.summary);
+  assert.equal(retained.items.find(row=>row.id===requests[0].requestId).estimatedMicrousd,1001);
+  assert.equal(retained.items[0].responseStatus,null);
+  assert.doesNotMatch(JSON.stringify(retained),/sessionId|session_id|payloadHmac|payload_hmac|idempotency/);
+  const empty=await r.listAiCosts({from:'2026-11-02',to:'2026-11-03'});
+  assert.equal(empty.total,0);
+  assert.equal(empty.summary.averageMicrousd,null);
+  assert.equal(empty.summary.estimatedMicrousd,0);
+  await assert.rejects(()=>r.listAiCosts({country:'IN'}));
+  await assert.rejects(()=>r.listAiCosts({limit:101}));
+});
 function call(extra = {}) {
   const id = crypto.randomUUID();
   return {
